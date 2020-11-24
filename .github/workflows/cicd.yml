@@ -3,7 +3,7 @@ on: [push]
 name: CI/CD
 
 jobs:
-  build:
+  build_and_deploy:
     name: Build project
     runs-on: ubuntu-latest
     steps:
@@ -18,11 +18,22 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - uses: actions-rs/cargo@v1
+      - name: "Install Cargo RPM"
+        uses: actions-rs/cargo@v1
         with:
           command: install
           args: cargo-rpm
-      - uses: actions-rs/cargo@v1
+      - name: "Build RPM"
+        uses: actions-rs/cargo@v1
         with:
           command: rpm
           args: build -v
+      - name: "Copy RPMs to the server"
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.PORT }}
+          source: "target/release/rpmbuild/RPMS/x86_64/*.rpm"
+          target: "~/"
