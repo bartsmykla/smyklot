@@ -37,3 +37,17 @@ jobs:
           port: ${{ secrets.PORT }}
           source: "target/release/rpmbuild/RPMS/x86_64/*.rpm"
           target: "~/"
+          strip_components: 6
+      - name: "Install doctl"
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: "Install RPM"
+        run: |
+          TMP_PATH="$(mktemp)"; \
+          echo "${{ secrets.KEY }}" > "$TMP_PATH"; \
+          doctl compute ssh \
+            --ssh-user ${{ secrets.USERNAME }} \
+            --ssh-key-path "$TMP_PATH" \
+            --ssh-command "sudo yum localinstall -y ~/*.rpm" \
+            smyklot
