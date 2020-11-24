@@ -6,6 +6,15 @@ version = "0.1.0"
 authors = ["Bart Smykla <bsmykla@vmware.com>"]
 edition = "2018"
 
+[package.metadata.rpm]
+package = "smyklot"
+
+[package.metadata.rpm.cargo]
+buildflags = ["--release"]
+
+[package.metadata.rpm.targets]
+smyklot = { path = "/usr/local/bin/smyklot" }
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
