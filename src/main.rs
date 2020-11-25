@@ -11,24 +11,53 @@ use serenity::framework::standard::{
 };
 
 use std::env;
+use serenity::http::Http;
+use std::collections::HashSet;
 
 #[group]
-#[commands(ping, pong, pif, paf)]
+#[commands(ping, pong, pif, paf, do_you_know)]
 struct General;
 
 struct Handler;
 
 #[async_trait]
-impl EventHandler for Handler {}
+impl EventHandler for Handler {
+    async fn message(&self, ctx: Context, msg: Message) {
+        let bot_user_ud = ctx.cache.current_user_id().await;
+        if msg.content == format!("<@!{}> po ile schab?", bot_user_ud.to_string()) {
+            if msg.author.name == "bartsmykla" {
+                msg.reply(ctx, "dla Ciebie dycha").await;
+            } else {
+                msg.reply(ctx, "nie stać cię").await;
+            }
+        }
+    }
+}
 
 #[tokio::main]
-async fn main() {
+async fn main() {    // Login with a bot token from the environment
+    let token = env::var("DISCORD_TOKEN").expect("token");
+
+    let http = Http::new_with_token(&token);
+
+    // We will fetch your bot's owners and id
+    let (owners, _bot_id) = match http.get_current_application_info().await {
+        Ok(info) => {
+            println!("{:?}", info);
+            let mut owners = HashSet::new();
+            owners.insert(info.owner.id);
+
+            (owners, info.id)
+        },
+        Err(why) => panic!("Could not access application info: {:?}", why),
+    };
+
+    println!("{}", _bot_id);
+
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!")) // set the bot prefix to "!"
+        .configure(|c| c.prefix(format!("<@!{}>", _bot_id).as_str()).with_whitespace(true)) // set the bot prefix to "!"
         .group(&GENERAL_GROUP);
 
-    // Login with a bot token from the environment
-    let token = env::var("DISCORD_TOKEN").expect("token");
     let mut client = Client::builder(token)
         .event_handler(Handler)
         .framework(framework)
@@ -83,6 +112,13 @@ async fn pif(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn paf(ctx: &Context, msg: &Message) -> CommandResult {
     msg.reply(ctx, PingType::Paf.reply()).await?;
+
+    Ok(())
+}
+
+#[command("znasz")]
+async fn do_you_know(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.reply(ctx, "pierwsze słyszę").await?;
 
     Ok(())
 }
