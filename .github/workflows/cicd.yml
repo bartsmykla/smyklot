@@ -34,4 +34,4 @@ jobs:
           author_name: github-actions
           author_email: 41898282+github-actions[bot]@users.noreply.github.com
           message: "Bump version"
-          add: ["Cargo.toml", "Cargo.lock"]
+          add: "Cargo.toml Cargo.lock"
