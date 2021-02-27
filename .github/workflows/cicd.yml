@@ -38,7 +38,7 @@ jobs:
     - name: "Prepare variables"
       id: vars
       run: |
-        VERSION="$(cargo read-manifest | jq '.version')"
+        VERSION="$(cargo read-manifest | jq -r '.version')"
 
         TAGS="ghcr.io/${{ github.repository }}:${VERSION}"
         if [[ $GITHUB_REF == ref/head/master ]]; then
