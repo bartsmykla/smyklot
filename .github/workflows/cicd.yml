@@ -27,7 +27,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: bump
-          args: patch --git-tag
+          args: patch
       - name: "Save version to output"
         id: vars
         run: echo ::set-output name=version::$(cargo read-manifest | jq '.version')
@@ -38,4 +38,4 @@ jobs:
           author_email: 41898282+github-actions[bot]@users.noreply.github.com
           message: "Bump version to: ${{ steps.vars.outputs.version }} "
           add: "Cargo.toml Cargo.lock"
-          tag: "${{ steps.vars.outputs.docker_tag }}"
+          tag: "${{ steps.vars.outputs.version }}"
