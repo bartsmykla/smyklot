@@ -106,7 +106,7 @@ jobs:
       run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 smyklot
 
     - name: "Deploy to DigitalOcean Kubernetes"
-      run: kubectl apply -f $GITHUB_WORKSPACE/deploy/k8s/deployment.yml
+      run: kubectl apply -n smyklot -f $GITHUB_WORKSPACE/deploy/k8s/deployment.yml
 
     - name: "Verify deployment"
-      run: kubectl rollout status deployment/smyklot
+      run: kubectl rollout status -n smyklot deployment/smyklot
