@@ -36,7 +36,6 @@ jobs:
       uses: crazy-max/ghaction-docker-meta@v1
       with:
         images: |
-          bartsmykla/smyklot
           ghcr.io/bartsmykla/smyklot
         tag-sha: true
     - name: "Build and push"
