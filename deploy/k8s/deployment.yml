@@ -17,8 +17,8 @@ spec:
       containers:
       - name: smyklot
         image: ghcr.io/bartsmykla/smyklot:latest
+        envFrom:
+        - secretRef:
+            name: discord
       imagePullSecrets:
       - name: ghcr-docker-registry-secret
-      envFrom:
-      - secretRef:
-          name: discord

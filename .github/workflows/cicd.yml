@@ -13,10 +13,15 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: |
-          ~/.cargo/registry
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
           ~/.cargo/git
           ~/.cargo/bin/cargo-bump
-          target
+          ~/.cargo/.crates.toml
+          ~/.cargo/.crates2.json
+          ~/.cargo/.package-cache
+          ~/.cargo/env
+          ./target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: "Login to GitHub Container Registry"
       uses: docker/login-action@v1
