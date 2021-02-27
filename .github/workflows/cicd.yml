@@ -6,6 +6,8 @@ jobs:
   build_image:
     name: "Build and push container image"
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
     steps:
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
@@ -75,3 +77,31 @@ jobs:
         message: "Bump version to: ${{ steps.vars.outputs.version }} "
         add: "Cargo.toml Cargo.lock"
         tag: "${{ steps.vars.outputs.version }}"
+        
+  deploy:
+    name: "Deploy image to Digital Ocean K8s cluster"
+    needs: build_image
+    runs-on: ubuntu-latest
+    steps:
+    - name: "Checkout"
+      uses: actions/checkout@v2
+
+    - name: "Install doctl"
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+    - name: "Update deployment file"
+      run: |
+        TAG=${{ needs.build_image.outputs.version }}
+        
+        sed -i 's|ghcr.io/bartsmykla/smyklot:latest|ghcr.io/bartsmykla/smyklot:'${TAG}'|' $GITHUB_WORKSPACE/deploy/k8s/deployment.yml
+
+    - name: "Save DigitalOcean kubeconfig with short-lived credentials"
+      run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 smyklot
+
+    - name: "Deploy to DigitalOcean Kubernetes"
+      run: kubectl apply -f $GITHUB_WORKSPACE/deploy/k8s/deployment.yml
+
+    - name: "Verify deployment"
+      run: kubectl rollout status deployment/smyklot
