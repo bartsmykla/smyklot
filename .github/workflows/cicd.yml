@@ -13,6 +13,7 @@ jobs:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
+          ~/.cargo/bin/cargo-bump
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: "Login to GitHub Container Registry"
@@ -29,6 +30,20 @@ jobs:
       uses: docker/setup-qemu-action@v1
     - name: "Set up Docker Buildx"
       uses: docker/setup-buildx-action@v1
+    - name: "Install cargo-bump"
+      uses: actions-rs/cargo@v1
+      with:
+        command: install
+        args: cargo-bump
+    - name: "Bump Cargo version and create a git tag"
+      uses: actions-rs/cargo@v1
+      with:
+        command: bump
+        args: patch
+    - name: "Regenerate Cargo.lock file"
+      uses: actions-rs/cargo@v1
+      with:
+        command: generate-lockfile
     - name: "Prepare variables"
       id: vars
       run: |
@@ -38,8 +53,9 @@ jobs:
         if [[ $GITHUB_REF == ref/head/master ]]; then
           TAGS="$TAGS,ghcr.io/${{ github.repository }}:latest"
         fi
-        
+
         echo ::set-output name=tags::${TAGS}
+        echo ::set-output name=version::${VERSION}
     - name: "Build and push"
       id: docker_build
       uses: docker/build-push-action@v2
@@ -50,43 +66,12 @@ jobs:
         tags: ${{ steps.vars.outputs.tags }}
     - name: "Image digest"
       run: echo ${{ steps.docker_build.outputs.digest }}
-      
-  bump_version:
-    needs: build_image
-    name: "Bump Version and create Tag"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/cargo-bump
-          key: ${{ runner.os }}-cargo-bumb-${{ hashFiles('**/Cargo.lock') }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: "Install cargo-bump"
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-bump
-      - name: "Bump Cargo version and create a git tag"
-        uses: actions-rs/cargo@v1
-        with:
-          command: bump
-          args: patch
-      - name: "Regenerate Cargo.lock file"
-        uses: actions-rs/cargo@v1
-        with:
-          command: generate-lockfile
-      - name: "Save version to output"
-        id: vars
-        run: echo ::set-output name=version::$(cargo read-manifest | jq '.version')
-      - name: "Commit bumped version"
-        uses: EndBug/add-and-commit@v7.0.0
-        with:
-          author_name: github-actions
-          author_email: 41898282+github-actions[bot]@users.noreply.github.com
-          message: "Bump version to: ${{ steps.vars.outputs.version }} "
-          add: "Cargo.toml Cargo.lock"
-          tag: "${{ steps.vars.outputs.version }}"
+    - name: "Commit bumped version"
+      if: success()
+      uses: EndBug/add-and-commit@v7.0.0
+      with:
+        author_name: github-actions
+        author_email: 41898282+github-actions[bot]@users.noreply.github.com
+        message: "Bump version to: ${{ steps.vars.outputs.version }} "
+        add: "Cargo.toml Cargo.lock"
+        tag: "${{ steps.vars.outputs.version }}"
