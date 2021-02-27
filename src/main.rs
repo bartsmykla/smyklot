@@ -13,6 +13,7 @@ use serenity::framework::standard::{
 use std::env;
 use serenity::http::Http;
 use std::collections::HashSet;
+use serenity::model::id::GuildId;
 
 #[group]
 #[commands(ping, pong, pif, paf, do_you_know)]
@@ -40,8 +41,8 @@ async fn main() {    // Login with a bot token from the environment
 
     let http = Http::new_with_token(&token);
 
-    // We will fetch your bot's owners and id
-    let (owners, _bot_id) = match http.get_current_application_info().await {
+    // We will fetch your bot owners and id
+    let (_owners, _bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
             println!("{:?}", info);
             let mut owners = HashSet::new();
@@ -122,4 +123,3 @@ async fn do_you_know(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
-

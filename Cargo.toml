@@ -18,5 +18,8 @@ smyklot = { path = "/usr/bin/smyklot" }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serenity = "0.9.1"
-tokio = { version = "0.2", features = ["macros"] }
+serenity = "0.10.2"
+
+[dependencies.tokio]
+version = "1.0"
+features = ["macros", "rt-multi-thread"]
