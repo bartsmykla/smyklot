@@ -1,5 +1,3 @@
-#![feature(allocator_api)]
-
 use serenity::async_trait;
 use serenity::client::{Client, Context, EventHandler};
 use serenity::model::channel::Message;
@@ -15,8 +13,6 @@ use serenity::framework::standard::{
 use std::env;
 use serenity::http::Http;
 use std::collections::HashSet;
-use serenity::model::id::GuildId;
-use std::alloc::Global;
 
 #[group]
 #[commands(ping, pong, pif, paf, do_you_know, version)]
@@ -29,10 +25,14 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         let bot_user_ud = ctx.cache.current_user_id().await;
         if msg.content == format!("<@!{}> po ile schab?", bot_user_ud.to_string()) {
-            if msg.author.name == "bartsmykla" {
-                msg.reply(ctx, "dla Ciebie dycha").await;
+            let message = if msg.author.name == "bartsmykla" {
+                "dla Ciebie dycha"
             } else {
-                msg.reply(ctx, "nie stać cię").await;
+                "nie stać cię"
+            };
+            
+            if let Err(e) = msg.reply(ctx, message).await {
+                println!("Error when tried to send a message: {}", e)
             }
         }
     }
