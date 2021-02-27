@@ -4,6 +4,7 @@ name: CI/CD
 
 jobs:
   login_to_registry:
+    name: "Login to Container Registry"
     runs-on: ubuntu-latest
     steps:
     - name: "Login to GitHub Packages Docker Registry"
@@ -60,6 +61,14 @@ jobs:
     needs: bump_version
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: "Set up QEMU"
       uses: docker/setup-qemu-action@v1
     - name: "Set up Docker Buildx"
