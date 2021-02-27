@@ -101,6 +101,7 @@ jobs:
         TAG=${{ needs.build_image.outputs.version }}
         
         sed -i 's|ghcr.io/bartsmykla/smyklot:latest|ghcr.io/bartsmykla/smyklot:'${TAG}'|' $GITHUB_WORKSPACE/deploy/k8s/deployment.yml
+        sed -i 's|"{{version}}"|'${TAG}'|' $GITHUB_WORKSPACE/deploy/k8s/deployment.yml
 
     - name: "Save DigitalOcean kubeconfig with short-lived credentials"
       run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 smyklot

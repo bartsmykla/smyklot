@@ -20,5 +20,8 @@ spec:
         envFrom:
         - secretRef:
             name: discord
+        env:
+        - name: SMYKLOT_VERSION
+          value: "{{version}}"
       imagePullSecrets:
       - name: ghcr-docker-registry-secret

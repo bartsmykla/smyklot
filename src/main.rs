@@ -1,3 +1,5 @@
+#![feature(allocator_api)]
+
 use serenity::async_trait;
 use serenity::client::{Client, Context, EventHandler};
 use serenity::model::channel::Message;
@@ -14,9 +16,10 @@ use std::env;
 use serenity::http::Http;
 use std::collections::HashSet;
 use serenity::model::id::GuildId;
+use std::alloc::Global;
 
 #[group]
-#[commands(ping, pong, pif, paf, do_you_know)]
+#[commands(ping, pong, pif, paf, do_you_know, version)]
 struct General;
 
 struct Handler;
@@ -106,6 +109,20 @@ async fn pong(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn pif(ctx: &Context, msg: &Message) -> CommandResult {
     msg.reply(ctx, PingType::Pif.reply()).await?;
+
+    Ok(())
+}
+
+#[command]
+async fn version(ctx: &Context, msg: &Message) -> CommandResult {
+    let version = env::var("SMYKLOT_VERSION");
+    
+    let message = match version {
+        Ok(v) if v != "{{version}}" => v,
+        _ => String::from("¯\\_(ツ)_/¯")
+    };
+
+    msg.reply(ctx, message).await?;
 
     Ok(())
 }
