@@ -18,36 +18,20 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: "Install Cargo RPM"
+      - name: "Install cargo-bump"
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: cargo-rpm
-      - name: "Build RPM"
+          args: cargo-bump
+      - name: "Bump Cargo version and create a git tag"
         uses: actions-rs/cargo@v1
         with:
-          command: rpm
-          args: build -v
-      - name: "Copy RPMs to the server"
-        uses: appleboy/scp-action@master
+          command: bump
+          args: minor --git-tag
+      - name: "Commit bumped version"
+        uses: EndBug/add-and-commit@v7.0.0
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.KEY }}
-          port: ${{ secrets.PORT }}
-          source: "target/release/rpmbuild/RPMS/x86_64/*.rpm"
-          target: "~/"
-          strip_components: 6
-      - name: "Install doctl"
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-      - name: "Install RPM"
-        run: |
-          TMP_PATH="$(mktemp)"; \
-          echo "${{ secrets.KEY }}" > "$TMP_PATH"; \
-          doctl compute ssh \
-            --ssh-user ${{ secrets.USERNAME }} \
-            --ssh-key-path "$TMP_PATH" \
-            --ssh-command "sudo yum localinstall -y ~/*.rpm" \
-            smyklot
+          author_name: github-actions
+          author_email: 41898282+github-actions[bot]@users.noreply.github.com
+          message: "Bump version"
+          add: "Cargo.toml"
