@@ -14,6 +14,7 @@ use log::{info, error};
 
 use std::env;
 use std::collections::HashSet;
+use serenity::model::id::{GuildId, ChannelId};
 
 #[group]
 #[commands(ping, pong, pif, paf, do_you_know, version)]
@@ -23,6 +24,23 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
+    async fn cache_ready(&self, ctx: Context, _guilds: Vec<GuildId>) {
+        let general = ChannelId::from(602839072985055237);
+
+        let version = env::var("SMYKLOT_VERSION");
+
+        let message = match version {
+            Ok(v) if v != "{{version}}" => {
+                format!("Dzień doberek. Właśnie została zdeployowana moja nowa wersja: {}", v)
+            },
+            _ => String::from("Dzień doberek")
+        };
+        
+        if let Err(e) = general.say(ctx, message).await {
+            error!("Error when tried to send initial message: {}", e)
+        };
+    }
+
     async fn message(&self, ctx: Context, msg: Message) {
         let bot_user_ud = ctx.cache.current_user_id().await;
         
