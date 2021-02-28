@@ -18,9 +18,12 @@ smyklot = { path = "/usr/bin/smyklot" }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serenity = "0.10.2"
 log = "0.4.14"
 env_logger = "0.8.3"
+
+[dependencies.serenity]
+version = "0.10.2"
+features = ["framework", "standard_framework"]
 
 [dependencies.tokio]
 version = "1.0"

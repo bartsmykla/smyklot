@@ -23,6 +23,8 @@ spec:
         env:
         - name: SMYKLOT_VERSION
           value: "{{version}}"
+        - name: SMYKLOT_ENV
+          value: production
         - name: RUST_LOG
           value: info
       imagePullSecrets:
