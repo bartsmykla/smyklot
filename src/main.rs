@@ -9,9 +9,10 @@ use serenity::framework::standard::{
         group,
     },
 };
+use serenity::http::Http;
+use log::{info, error};
 
 use std::env;
-use serenity::http::Http;
 use std::collections::HashSet;
 
 #[group]
@@ -24,6 +25,7 @@ struct Handler;
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         let bot_user_ud = ctx.cache.current_user_id().await;
+        
         if msg.content == format!("<@!{}> po ile schab?", bot_user_ud.to_string()) {
             let message = if msg.author.name == "bartsmykla" {
                 "dla Ciebie dycha"
@@ -32,14 +34,16 @@ impl EventHandler for Handler {
             };
             
             if let Err(e) = msg.reply(ctx, message).await {
-                println!("Error when tried to send a message: {}", e)
+                error!("Error when tried to send a message: {}", e)
             }
         }
     }
 }
 
 #[tokio::main]
-async fn main() {    // Login with a bot token from the environment
+async fn main() {
+    env_logger::init();
+    
     let token = env::var("DISCORD_TOKEN").expect("token");
 
     let http = Http::new_with_token(&token);
@@ -47,7 +51,7 @@ async fn main() {    // Login with a bot token from the environment
     // We will fetch your bot owners and id
     let (_owners, _bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
-            println!("{:?}", info);
+            info!("{:?}", info);
             let mut owners = HashSet::new();
             owners.insert(info.owner.id);
 
@@ -56,10 +60,10 @@ async fn main() {    // Login with a bot token from the environment
         Err(why) => panic!("Could not access application info: {:?}", why),
     };
 
-    println!("{}", _bot_id);
+    info!("bot id: {}", _bot_id);
 
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix(format!("<@!{}>", _bot_id).as_str()).with_whitespace(true)) // set the bot prefix to "!"
+        .configure(|c| c.prefix(format!("<@!{}>", _bot_id).as_str()).with_whitespace(true))
         .group(&GENERAL_GROUP);
 
     let mut client = Client::builder(token)
@@ -70,7 +74,7 @@ async fn main() {    // Login with a bot token from the environment
 
     // start listening for events by starting a single shard
     if let Err(why) = client.start().await {
-        println!("An error occurred while running the client: {:?}", why);
+        error!("An error occurred while running the client: {:?}", why);
     }
 }
 

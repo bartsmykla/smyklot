@@ -19,6 +19,8 @@ smyklot = { path = "/usr/bin/smyklot" }
 
 [dependencies]
 serenity = "0.10.2"
+log = "0.4.14"
+env_logger = "0.8.3"
 
 [dependencies.tokio]
 version = "1.0"

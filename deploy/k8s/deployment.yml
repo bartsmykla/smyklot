@@ -23,5 +23,7 @@ spec:
         env:
         - name: SMYKLOT_VERSION
           value: "{{version}}"
+        - name: RUST_LOG
+          value: info
       imagePullSecrets:
       - name: ghcr-docker-registry-secret
