@@ -49,7 +49,7 @@ async fn main() {
     let http = Http::new_with_token(&token);
 
     // We will fetch your bot owners and id
-    let (_owners, _bot_id) = match http.get_current_application_info().await {
+    let (_owners, bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
             info!("{:?}", info);
             let mut owners = HashSet::new();
@@ -60,10 +60,13 @@ async fn main() {
         Err(why) => panic!("Could not access application info: {:?}", why),
     };
 
-    info!("bot id: {}", _bot_id);
+    info!("bot id: {}", bot_id);
+    
+    let bot_prefix = format!("<@!{}>", bot_id);
+    let prefixes = vec![bot_prefix.as_str(), "!"];
 
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix(format!("<@!{}>", _bot_id).as_str()).with_whitespace(true))
+        .configure(|c| c.prefixes(prefixes).with_whitespace(true))
         .group(&GENERAL_GROUP);
 
     let mut client = Client::builder(token)
