@@ -4,6 +4,7 @@ on:
     - main
     paths:
     - src/**
+    - deploy/**
 
 name: CI/CD
 
