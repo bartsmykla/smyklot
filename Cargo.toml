@@ -20,6 +20,8 @@ smyklot = { path = "/usr/bin/smyklot" }
 [dependencies]
 log = "0.4.14"
 env_logger = "0.8.3"
+serde = "1.0.123"
+serde_json = "1.0.64"
 
 [dependencies.serenity]
 version = "0.10.2"

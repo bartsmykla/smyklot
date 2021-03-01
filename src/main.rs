@@ -1,11 +1,9 @@
 use log::{error};
 
-use tokio::sync::Mutex;
-
-use std::{collections::{HashSet}, env, sync::Arc};
+use std::{collections::{HashSet}, env};
+use serde_json::json;
 use serenity::{
     async_trait,
-    client::bridge::gateway::{ShardManager},
     framework::standard::{
         Args, CommandOptions, CommandResult, CommandGroup,
         HelpOptions, help_commands, Reason, StandardFramework,
@@ -15,23 +13,16 @@ use serenity::{
     http::Http,
     model::{
         channel::{Channel, Message},
-        id::{ChannelId, GuildId, UserId},
+        id::{ChannelId, GuildId, UserId, EmojiId},
+        guild::{
+            Emoji as SerenityEmoji,
+            Role,
+        },
     },
+    utils::MessageBuilder,
 };
 
 use serenity::prelude::*;
-
-struct ShardManagerContainer;
-
-impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<Mutex<ShardManager>>;
-}
-
-struct Version;
-
-impl TypeMapKey for Version {
-    type Value = String;
-}
 
 // The framework provides two built-in help commands for you to use.
 // But you can also make your own customized help command that forwards
@@ -287,8 +278,20 @@ async fn cat(ctx: &Context, msg: &Message) -> CommandResult {
 #[aliases("af", "afek", "afrael", "bartsmykla", "bakłażan")]
 #[bucket = "emoji"]
 async fn eggplant(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id.say(&ctx.http, ":eggplant~1:").await?;
+    let emoji = serde_json::from_value::<SerenityEmoji>(json!({
+        "animated": false,
+        "id": EmojiId(815856883771506768),
+        "managed": false,
+        "name": "baklazan".to_string(),
+        "require_colons": false,
+        "roles": Vec::<Role>::new(),
+     }))?;
 
+    msg.channel_id.say(&ctx.http, MessageBuilder::new()
+        .emoji(&emoji)
+        .build()
+    ).await?;
+    
     Err(RevertBucket.into())
 }
 
