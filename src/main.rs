@@ -95,7 +95,7 @@ struct General;
 #[summary = "Do emoji fun!"]
 // Sets a command that will be executed if only a group-prefix was passed.
 #[default_command(bird)]
-#[commands(cat, dog)]
+#[commands(cat, dog, eggplant)]
 struct Emoji;
 
 #[group]
@@ -273,14 +273,22 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-// Adds multiple aliases
-#[aliases("kitty", "neko")]
 // Make this command use the "emoji" bucket.
 #[bucket = "emoji"]
 async fn cat(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.say(&ctx.http, ":cat:").await?;
 
     // We can return one ticket to the bucket undoing the ratelimit.
+    Err(RevertBucket.into())
+}
+
+#[command]
+#[description = "Sends an emoji with an eggplant."]
+#[aliases("af", "afek", "afrael", "bartsmykla")]
+#[bucket = "emoji"]
+async fn eggplant(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.channel_id.say(&ctx.http, ":eggplant-1:").await?;
+
     Err(RevertBucket.into())
 }
 
