@@ -287,7 +287,7 @@ async fn cat(ctx: &Context, msg: &Message) -> CommandResult {
 #[aliases("af", "afek", "afrael", "bartsmykla", "bakłażan")]
 #[bucket = "emoji"]
 async fn eggplant(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id.say(&ctx.http, ":eggplant-1:").await?;
+    msg.channel_id.say(&ctx.http, ":eggplant~1:").await?;
 
     Err(RevertBucket.into())
 }
