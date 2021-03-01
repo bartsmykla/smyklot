@@ -180,7 +180,7 @@ async fn main() {
     let framework = StandardFramework::new()
         .configure(|c| c
             .prefix("!")
-            .with_whitespace(gtrue)
+            .with_whitespace(true)
             .on_mention(Some(bot_id))
             // In this case, if "," would be first, a message would never
             // be delimited at ", ", forcing you to trim your arguments if you
