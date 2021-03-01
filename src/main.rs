@@ -180,7 +180,7 @@ async fn main() {
     let framework = StandardFramework::new()
         .configure(|c| c
             .prefix("!")
-            .with_whitespace(true)
+            .with_whitespace(gtrue)
             .on_mention(Some(bot_id))
             // In this case, if "," would be first, a message would never
             // be delimited at ", ", forcing you to trim your arguments if you
@@ -278,13 +278,13 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 async fn cat(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.say(&ctx.http, ":cat:").await?;
 
-    // We can return one ticket to the bucket undoing the ratelimit.
+    // We can return one ticket to the bucket undoing the rate limit.
     Err(RevertBucket.into())
 }
 
 #[command]
 #[description = "Sends an emoji with an eggplant."]
-#[aliases("af", "afek", "afrael", "bartsmykla")]
+#[aliases("af", "afek", "afrael", "bartsmykla", "bakłażan")]
 #[bucket = "emoji"]
 async fn eggplant(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.say(&ctx.http, ":eggplant-1:").await?;
