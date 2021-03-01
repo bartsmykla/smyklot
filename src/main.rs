@@ -146,7 +146,7 @@ async fn main() {
     env_logger::init();
 
     let token = env::var("DISCORD_TOKEN").expect(
-        "Expected a token in the environment",
+        "Expected a discord token in the environment - `DISCORD_TOKEN`",
     );
     
     let http = Http::new_with_token(&token);
