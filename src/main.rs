@@ -337,7 +337,6 @@ async fn linux(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-
 #[command]
 #[description = "Sends opinion about windows."]
 #[aliases("winda", "windows 10", "windows vista", "windows xp")]
@@ -347,7 +346,6 @@ async fn windows(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
-
 
 #[command]
 // Make this command use the "emoji" bucket.
