@@ -275,7 +275,7 @@ async fn cat(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[description = "Sends an emoji with an eggplant."]
-#[aliases("af", "afek", "afrael", "bartsmykla", "bakłażan")]
+#[aliases("af", "afek", "afrael", "bartsmykla", "bakłażan", "baklazan")]
 #[bucket = "emoji"]
 async fn eggplant(ctx: &Context, msg: &Message) -> CommandResult {
     let emoji = serde_json::from_value::<SerenityEmoji>(json!({
