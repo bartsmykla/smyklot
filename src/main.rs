@@ -91,6 +91,7 @@ struct General;
 struct Emoji;
 
 #[group]
+#[owners_only]
 #[prefixes("act")]
 #[description = "A group of commands that lets you change the bot's activity presence."]
 #[summary = "Change bot's activity presence"]
