@@ -3,6 +3,7 @@ use log::{error};
 use std::{collections::{HashSet}, env};
 use serde_json::json;
 use serenity::{
+    prelude::*,
     async_trait,
     framework::standard::{
         Args, CommandOptions, CommandResult, CommandGroup,
@@ -18,11 +19,11 @@ use serenity::{
             Emoji as SerenityEmoji,
             Role,
         },
+        gateway::{Activity, Ready},
+        user::{OnlineStatus},
     },
     utils::MessageBuilder,
 };
-
-use serenity::prelude::*;
 
 // The framework provides two built-in help commands for you to use.
 // But you can also make your own customized help command that forwards
@@ -138,6 +139,16 @@ impl EventHandler for Handler {
                 error!("Error when tried to send a message: {}", e)
             }
         }
+    }
+    
+    async fn ready(&self, context: Context, _: Ready) {
+
+        let version = env::var("SMYKLOT_VERSION")
+            .unwrap_or(String::from("¯\\_(ツ)_/¯"));
+        let activity = Activity::playing(&version);
+        let status = OnlineStatus::Online;
+
+        context.set_presence(Some(activity), status).await
     }
 }
 
