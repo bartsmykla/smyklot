@@ -91,6 +91,13 @@ struct General;
 struct Emoji;
 
 #[group]
+#[prefixes("os")]
+#[summary = "Do operating system opinion fun!"]
+#[default_command(linux)]
+#[commands(mac, linux, windows)]
+struct Systems;
+
+#[group]
 #[owners_only]
 #[prefixes("act")]
 #[description = "A group of commands that lets you change the bot's activity presence."]
@@ -209,6 +216,7 @@ async fn main() {
         // #name is turned all uppercase
         .help(&MY_HELP)
         .group(&GENERAL_GROUP)
+        .group(&SYSTEMS_GROUP)
         .group(&EMOJI_GROUP)
         .group(&OWNER_GROUP)
         .group(&ACTIVITY_GROUP);
@@ -288,6 +296,12 @@ async fn version(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command("znasz")]
 async fn do_you_know(ctx: &Context, msg: &Message) -> CommandResult {
+    if msg.author.name == "zawiszaty" {
+        msg.reply(ctx, "tobie nie powiem").await?;
+
+        return Ok(());
+    }
+
     msg.reply(ctx, "pierwsze słyszę").await?;
 
     Ok(())
@@ -302,6 +316,38 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
+
+#[command]
+#[description = "Sends opinion about macos."]
+#[aliases("apple", "macos", "mac")]
+#[bucket = "systems"]
+async fn mac(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.reply(ctx, "Jak cię stać na ten szmelc").await?;
+
+    Ok(())
+}
+
+#[command]
+#[description = "Sends opinion about linux os."]
+#[aliases("pingwinie", "ubuntu", "i3")]
+#[bucket = "systems"]
+async fn linux(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.reply(ctx, "Jedyne słuszne rozwiązanie! :sunglasses:").await?;
+
+    Ok(())
+}
+
+
+#[command]
+#[description = "Sends opinion about windows."]
+#[aliases("winda", "windows 10", "windows vista", "windows xp")]
+#[bucket = "systems"]
+async fn windows(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.reply(ctx, "Jak zrestartujesz kompa to pogadamy").await?;
+
+    Ok(())
+}
+
 
 #[command]
 // Make this command use the "emoji" bucket.
