@@ -1,6 +1,6 @@
 use std::{collections::{HashSet}, env};
 
-use log::{error};
+use log::{info, error};
 use serde_json::json;
 use serenity::{
     prelude::*,
@@ -19,7 +19,7 @@ use serenity::{
             Emoji as SerenityEmoji,
             Role,
         },
-        gateway::{Activity, Ready},
+        gateway::{Activity as SerenityActivity, Ready},
         user::{OnlineStatus},
     },
     utils::MessageBuilder,
@@ -91,6 +91,14 @@ struct General;
 struct Emoji;
 
 #[group]
+#[prefixes("act")]
+#[description = "A group of commands that lets you change the bot's activity presence."]
+#[summary = "Change bot's activity presence"]
+#[default_command(activity)]
+#[commands(play)]
+struct Activity;
+
+#[group]
 #[owners_only]
 // Limit all commands to be guild-restricted.
 #[only_in(guilds)]
@@ -145,7 +153,7 @@ impl EventHandler for Handler {
 
         let version = env::var("SMYKLOT_VERSION")
             .unwrap_or(String::from("¯\\_(ツ)_/¯"));
-        let activity = Activity::playing(&version);
+        let activity = SerenityActivity::playing(&version);
         let status = OnlineStatus::Online;
 
         context.set_presence(Some(activity), status).await
@@ -201,7 +209,8 @@ async fn main() {
         .help(&MY_HELP)
         .group(&GENERAL_GROUP)
         .group(&EMOJI_GROUP)
-        .group(&OWNER_GROUP);
+        .group(&OWNER_GROUP)
+        .group(&ACTIVITY_GROUP);
 
     let mut client = Client::builder(token)
         .event_handler(Handler)
@@ -240,6 +249,25 @@ async fn owner_check(_: &Context, msg: &Message, _: &mut Args, _: &CommandOption
         return Err(Reason::User("Lacked owner permission".to_string()));
     }
 
+    Ok(())
+}
+
+#[command]
+#[checks(Owner)]
+async fn activity(_ctx: &Context, _msg: &Message, args: Args) -> CommandResult {
+    info!("args {:?}", args);
+    
+    Ok(())
+}
+
+#[command]
+#[checks(Owner)]
+#[bucket = "activity"]
+async fn play(ctx: &Context, _msg: &Message, args: Args) -> CommandResult {
+    let name = args.message();
+    
+    ctx.set_activity(SerenityActivity::playing(&name)).await;
+    
     Ok(())
 }
 
