@@ -1,6 +1,6 @@
-use log::{error};
-
 use std::{collections::{HashSet}, env};
+
+use log::{error};
 use serde_json::json;
 use serenity::{
     prelude::*,
