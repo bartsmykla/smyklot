@@ -261,14 +261,6 @@ async fn owner_check(_: &Context, msg: &Message, _: &mut Args, _: &CommandOption
 
 #[command]
 #[checks(Owner)]
-async fn activity(_ctx: &Context, _msg: &Message, args: Args) -> CommandResult {
-    info!("args {:?}", args);
-    
-    Ok(())
-}
-
-#[command]
-#[checks(Owner)]
 #[bucket = "activity"]
 async fn play(ctx: &Context, _msg: &Message, args: Args) -> CommandResult {
     let name = args.message();
