@@ -25,6 +25,7 @@ use commands::{
     emoji::*,
     activity::*,
     systems::*,
+    version::*,
 };
 
 // The framework provides two built-in help commands for you to use.
@@ -254,20 +255,6 @@ async fn owner_check(_: &Context, msg: &Message, _: &mut Args, _: &CommandOption
     if msg.author.id != 355607930168541185 {
         return Err(Reason::User("Lacked owner permission".to_string()));
     }
-
-    Ok(())
-}
-
-#[command]
-async fn version(ctx: &Context, msg: &Message) -> CommandResult {
-    let version = env::var("SMYKLOT_VERSION");
-    
-    let message = match version {
-        Ok(v) if v != "{{version}}" => v,
-        _ => String::from("¯\\_(ツ)_/¯")
-    };
-
-    msg.reply(ctx, message).await?;
 
     Ok(())
 }
