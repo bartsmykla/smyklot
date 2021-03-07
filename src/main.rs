@@ -154,10 +154,11 @@ impl EventHandler for Handler {
             let version = config.version.as_str();
             
             let message = match version {
-                "{{version}}" => {
-                    format!("Dzień doberek. Właśnie została zdeployowana moja nowa wersja: {}", version)
-                },
-                _ => String::from("Dzień doberek")
+                "{{version}}" | "" => String::from("Dzień doberek"),
+                _ => format!(
+                    "Dzień doberek. Właśnie została zdeployowana moja nowa wersja: {}",
+                    version,
+                )
             };
             
             if let Err(e) = general.say(ctx, message).await {
@@ -217,6 +218,7 @@ async fn main() {
                 UserId::from(355607930168541185), // bartsmykla
                 UserId::from(534066481369972757), // mtl
                 UserId::from(143681393426169856), // mihn
+                UserId::from(207844448569131008), // michal-franc
             };
             
             if let Some(team) = info.team {
