@@ -2,7 +2,7 @@
 name = "smyklot"
 description = "simple discord bot"
 license = "MIT"
-version = "0.2.24"
+version = "0.2.25"
 authors = ["Bart Smykla <bsmykla@vmware.com>"]
 edition = "2018"
 
