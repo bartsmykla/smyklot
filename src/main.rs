@@ -1,7 +1,12 @@
-use std::{collections::{HashSet}, env};
+use std::{
+    env,
+    collections::{HashSet},
+    sync::Arc,
+};
 
 use maplit::hashset;
 use log::{error};
+use tokio::sync::RwLock;
 use serenity::{
     prelude::*,
     async_trait,
@@ -13,7 +18,7 @@ use serenity::{
     http::Http,
     model::{
         channel::{Channel, Message},
-        id::{ChannelId, GuildId, UserId},
+        id::{ChannelId, GuildId, UserId, RoleId},
         gateway::{Activity as SerenityActivity, Ready},
         user::{OnlineStatus},
     },
@@ -28,6 +33,26 @@ use commands::{
     version::*,
     do_you_know::*,
 };
+
+struct Config {
+    mute_role_id: Option<RoleId>,
+    general_channel_id: Option<ChannelId>,
+    version: String,
+}
+
+impl TypeMapKey for Config {
+    type Value = Arc<RwLock<Config>>;
+}
+
+impl Config {
+    fn new(version: String) -> Self {
+        Self {
+            version,
+            mute_role_id: None,
+            general_channel_id: None
+        }
+    }
+}
 
 // The framework provides two built-in help commands for you to use.
 // But you can also make your own customized help command that forwards
@@ -119,12 +144,18 @@ impl EventHandler for Handler {
         
         if environment.as_str() == "production" {
             let general = ChannelId::from(602839072985055237);
-    
-            let version = env::var("SMYKLOT_VERSION");
+            
+            let config_lock = ctx.data.read().await
+                .get::<Config>()
+                .expect("Missing Config in Context")
+                .clone();
+
+            let config = config_lock.read().await;
+            let version = config.version.as_str();
             
             let message = match version {
-                Ok(v) if v != "{{version}}" => {
-                    format!("Dzień doberek. Właśnie została zdeployowana moja nowa wersja: {}", v)
+                "{{version}}" => {
+                    format!("Dzień doberek. Właśnie została zdeployowana moja nowa wersja: {}", version)
                 },
                 _ => String::from("Dzień doberek")
             };
@@ -151,13 +182,18 @@ impl EventHandler for Handler {
         }
     }
     
-    async fn ready(&self, context: Context, _: Ready) {
-        let version = env::var("SMYKLOT_VERSION")
-            .unwrap_or(String::from("¯\\_(ツ)_/¯"));
-        let activity = SerenityActivity::playing(&version);
+    async fn ready(&self, ctx: Context, _: Ready) {
+        let config_lock = ctx.data.read().await
+            .get::<Config>()
+            .expect("Missing Config in Context")
+            .clone();
+        
+        let config = config_lock.read().await;
+        
+        let activity = SerenityActivity::playing(&config.version);
         let status = OnlineStatus::Online;
 
-        context.set_presence(Some(activity), status).await
+        ctx.set_presence(Some(activity), status).await
     }
 }
 
@@ -168,6 +204,9 @@ async fn main() {
     let token = env::var("DISCORD_TOKEN").expect(
         "Expected a discord token in the environment - `DISCORD_TOKEN`",
     );
+    
+    let version = env::var("SMYKLOT_VERSION")
+        .unwrap_or(String::from("¯\\_(ツ)_/¯"));
     
     let http = Http::new_with_token(&token);
 
@@ -225,6 +264,14 @@ async fn main() {
         .framework(framework)
         .await
         .expect("Error creating client");
+    
+    {
+        let mut data = client.data.write().await;
+        
+        let config = Config::new(version);
+        
+        data.insert::<Config>(Arc::new(RwLock::new(config)))
+    } 
 
     // start listening for events by starting a single shard
     if let Err(why) = client.start().await {

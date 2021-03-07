@@ -1,5 +1,3 @@
-use std::env;
-
 use serenity::{
     prelude::*,
     model::{
@@ -11,13 +9,21 @@ use serenity::{
     },
 };
 
+use crate::Config;
+
 #[command]
 async fn version(ctx: &Context, msg: &Message) -> CommandResult {
-    let version = env::var("SMYKLOT_VERSION");
+    let config_lock = ctx.data.read().await
+        .get::<Config>()
+        .expect("Missing Config in Context")
+        .clone();
+
+    let config = config_lock.read().await;
+    let version = config.version.as_str();
 
     let message = match version {
-        Ok(v) if v != "{{version}}" => v,
-        _ => String::from("¯\\_(ツ)_/¯")
+        "{{version}}" | "" => "¯\\_(ツ)_/¯",
+        _ => version
     };
 
     msg.reply(ctx, message).await?;
