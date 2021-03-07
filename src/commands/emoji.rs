@@ -4,14 +4,10 @@ use serenity::{
     model::{
         channel::{Message},
         id::{EmojiId},
-        guild::{
-            Emoji,
-            Role,
-        },
+        guild::{Emoji, Role},
     },
     framework::standard::{
-        CommandResult,
-        Args,
+        CommandResult, Args,
         buckets::{RevertBucket},
         macros::*,
     },
