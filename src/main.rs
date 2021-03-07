@@ -1,28 +1,28 @@
 use std::{collections::{HashSet}, env};
 
 use log::{info, error};
-use serde_json::json;
 use serenity::{
     prelude::*,
     async_trait,
     framework::standard::{
         Args, CommandOptions, CommandResult, CommandGroup,
         HelpOptions, help_commands, Reason, StandardFramework,
-        buckets::{RevertBucket},
         macros::{command, group, help, check},
     },
     http::Http,
     model::{
         channel::{Channel, Message},
-        id::{ChannelId, GuildId, UserId, EmojiId},
-        guild::{
-            Emoji as SerenityEmoji,
-            Role,
-        },
+        id::{ChannelId, GuildId, UserId},
+        
         gateway::{Activity as SerenityActivity, Ready},
         user::{OnlineStatus},
     },
-    utils::MessageBuilder,
+};
+
+mod commands;
+
+use commands::{
+    emoji::*,
 };
 
 // The framework provides two built-in help commands for you to use.
@@ -76,16 +76,9 @@ async fn my_help(
 struct General;
 
 #[group]
-// Sets multiple prefixes for a group.
-// This requires us to call commands in this group
-// via `~emoji` (or `~em`) instead of just `~`.
 #[prefixes("emoji", "em")]
-// Set a description to appear if a user wants to display a single group
-// e.g. via help using the group-name or one of its prefixes.
 #[description = "A group with commands providing an emoji as response."]
-// Summary only appears when listing multiple groups.
 #[summary = "Do emoji fun!"]
-// Sets a command that will be executed if only a group-prefix was passed.
 #[default_command(bird)]
 #[commands(cat, dog, eggplant)]
 struct Emoji;
@@ -102,17 +95,15 @@ struct Systems;
 #[prefixes("act")]
 #[description = "A group of commands that lets you change the bot's activity presence."]
 #[summary = "Change bot's activity presence"]
-#[default_command(activity)]
+#[default_command(play)]
 #[commands(play)]
 struct Activity;
 
 #[group]
 #[owners_only]
-// Limit all commands to be guild-restricted.
 #[only_in(guilds)]
-// Summary only appears when listing multiple groups.
 #[summary = "Commands for server owners"]
-#[commands(slow_mode)]
+#[commands(slow_mode, activity)]
 struct Owner;
 
 struct Handler;
@@ -308,7 +299,6 @@ async fn do_you_know(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-// Limit command usage to guilds.
 #[only_in(guilds)]
 #[checks(Owner)]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
@@ -346,61 +336,6 @@ async fn windows(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
-
-#[command]
-// Make this command use the "emoji" bucket.
-#[bucket = "emoji"]
-async fn cat(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id.say(&ctx.http, ":cat:").await?;
-
-    // We can return one ticket to the bucket undoing the rate limit.
-    Err(RevertBucket.into())
-}
-
-#[command]
-#[description = "Sends an emoji with an eggplant."]
-#[aliases("af", "afek", "afrael", "bartsmykla", "bakłażan", "baklazan")]
-#[bucket = "emoji"]
-async fn eggplant(ctx: &Context, msg: &Message) -> CommandResult {
-    let emoji = serde_json::from_value::<SerenityEmoji>(json!({
-        "animated": false,
-        "id": EmojiId(815856883771506768),
-        "managed": false,
-        "name": "baklazan".to_string(),
-        "require_colons": false,
-        "roles": Vec::<Role>::new(),
-     }))?;
-
-    msg.channel_id.say(&ctx.http, MessageBuilder::new()
-        .emoji(&emoji)
-        .build()
-    ).await?;
-    
-    Err(RevertBucket.into())
-}
-
-#[command]
-#[description = "Sends an emoji with a dog."]
-#[bucket = "emoji"]
-async fn dog(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id.say(&ctx.http, ":dog:").await?;
-
-    Ok(())
-}
-
-#[command]
-async fn bird(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let say_content = if args.is_empty() {
-        ":bird: can find animals for you.".to_string()
-    } else {
-        format!(":bird: could not find animal named: `{}`.", args.rest())
-    };
-
-    msg.channel_id.say(&ctx.http, say_content).await?;
-
-    Ok(())
-}
-
 
 #[command]
 async fn slow_mode(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
