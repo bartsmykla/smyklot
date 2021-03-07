@@ -1,7 +1,7 @@
 use std::{collections::{HashSet}, env};
 
 use maplit::hashset;
-use log::{info, error};
+use log::{error};
 use serenity::{
     prelude::*,
     async_trait,
@@ -14,7 +14,6 @@ use serenity::{
     model::{
         channel::{Channel, Message},
         id::{ChannelId, GuildId, UserId},
-        
         gateway::{Activity as SerenityActivity, Ready},
         user::{OnlineStatus},
     },
@@ -24,6 +23,7 @@ mod commands;
 
 use commands::{
     emoji::*,
+    activity::*,
 };
 
 // The framework provides two built-in help commands for you to use.
@@ -104,7 +104,7 @@ struct Activity;
 #[owners_only]
 #[only_in(guilds)]
 #[summary = "Commands for server owners"]
-#[commands(slow_mode, activity)]
+#[commands(slow_mode)]
 struct Owner;
 
 struct Handler;
@@ -150,7 +150,6 @@ impl EventHandler for Handler {
     }
     
     async fn ready(&self, context: Context, _: Ready) {
-
         let version = env::var("SMYKLOT_VERSION")
             .unwrap_or(String::from("¯\\_(ツ)_/¯"));
         let activity = SerenityActivity::playing(&version);
@@ -256,17 +255,6 @@ async fn owner_check(_: &Context, msg: &Message, _: &mut Args, _: &CommandOption
         return Err(Reason::User("Lacked owner permission".to_string()));
     }
 
-    Ok(())
-}
-
-#[command]
-#[checks(Owner)]
-#[bucket = "activity"]
-async fn play(ctx: &Context, _msg: &Message, args: Args) -> CommandResult {
-    let name = args.message();
-    
-    ctx.set_activity(SerenityActivity::playing(&name)).await;
-    
     Ok(())
 }
 
