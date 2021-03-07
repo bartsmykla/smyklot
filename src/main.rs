@@ -24,6 +24,7 @@ mod commands;
 use commands::{
     emoji::*,
     activity::*,
+    systems::*,
 };
 
 // The framework provides two built-in help commands for you to use.
@@ -87,7 +88,6 @@ struct Emoji;
 #[group]
 #[prefixes("os")]
 #[summary = "Do operating system opinion fun!"]
-#[default_command(linux)]
 #[commands(mac, linux, windows)]
 struct Systems;
 
@@ -289,37 +289,7 @@ async fn do_you_know(ctx: &Context, msg: &Message) -> CommandResult {
 #[only_in(guilds)]
 #[checks(Owner)]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id.say(&ctx.http, "Pong! : )").await?;
-
-    Ok(())
-}
-
-#[command]
-#[description = "Sends opinion about macos."]
-#[aliases("apple", "macos", "mac")]
-#[bucket = "systems"]
-async fn mac(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(ctx, "Jak cię stać na ten szmelc").await?;
-
-    Ok(())
-}
-
-#[command]
-#[description = "Sends opinion about linux os."]
-#[aliases("pingwinie", "ubuntu", "i3")]
-#[bucket = "systems"]
-async fn linux(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(ctx, "Jedyne słuszne rozwiązanie! :sunglasses:").await?;
-
-    Ok(())
-}
-
-#[command]
-#[description = "Sends opinion about windows."]
-#[aliases("winda", "windows 10", "windows vista", "windows xp")]
-#[bucket = "systems"]
-async fn windows(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(ctx, "Jak zrestartujesz kompa to pogadamy").await?;
+    msg.channel_id.say(&ctx.http, "Pong! :-)").await?;
 
     Ok(())
 }
