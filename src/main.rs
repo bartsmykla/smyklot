@@ -26,6 +26,7 @@ use commands::{
     activity::*,
     systems::*,
     version::*,
+    do_you_know::*,
 };
 
 // The framework provides two built-in help commands for you to use.
@@ -255,19 +256,6 @@ async fn owner_check(_: &Context, msg: &Message, _: &mut Args, _: &CommandOption
     if msg.author.id != 355607930168541185 {
         return Err(Reason::User("Lacked owner permission".to_string()));
     }
-
-    Ok(())
-}
-
-#[command("znasz")]
-async fn do_you_know(ctx: &Context, msg: &Message) -> CommandResult {
-    if msg.author.name == "zawiszaty" {
-        msg.reply(ctx, "tobie nie powiem").await?;
-
-        return Ok(());
-    }
-
-    msg.reply(ctx, "pierwsze słyszę").await?;
 
     Ok(())
 }
