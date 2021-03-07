@@ -1,5 +1,6 @@
 use std::{collections::{HashSet}, env};
 
+use maplit::hashset;
 use log::{info, error};
 use serenity::{
     prelude::*,
@@ -172,12 +173,18 @@ async fn main() {
     // We will fetch your bot owners and id
     let (owners, bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
-            let mut owners = HashSet::new();
+            let mut owners = hashset! {
+                UserId::from(355607930168541185), // bartsmykla
+                UserId::from(534066481369972757), // mtl
+                UserId::from(143681393426169856), // mihn
+            };
+            
             if let Some(team) = info.team {
                 owners.insert(team.owner_user_id);
             } else {
                 owners.insert(info.owner.id);
             }
+            
             match http.get_current_user().await {
                 Ok(bot_id) => (owners, bot_id.id),
                 Err(why) => panic!("Could not access the bot id: {:?}", why),
