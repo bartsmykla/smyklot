@@ -138,7 +138,7 @@ struct Owner;
 
 #[group]
 #[owners_only]
-#[commands(mute, unmute)]
+#[commands(mute, unmute, muted)]
 struct Mute;
 
 struct Handler;
