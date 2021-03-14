@@ -5,15 +5,15 @@ use std::{
 };
 
 use maplit::hashset;
-use log::{error};
+use log::*;
 use tokio::sync::RwLock;
 use serenity::{
     prelude::*,
     async_trait,
     framework::standard::{
         Args, CommandOptions, CommandResult, CommandGroup,
-        HelpOptions, help_commands, Reason, StandardFramework,
-        macros::{command, group, help, check},
+        HelpOptions, help_commands, Reason, StandardFramework, DispatchError,
+        macros::{*},
     },
     http::Http,
     model::{
@@ -22,6 +22,7 @@ use serenity::{
         gateway::{Activity as SerenityActivity, Ready},
         user::{OnlineStatus},
     },
+    client::bridge::gateway::GatewayIntents,
 };
 
 mod commands;
@@ -32,6 +33,7 @@ use commands::{
     systems::*,
     version::*,
     do_you_know::*,
+    mute::*,
 };
 
 struct Config {
@@ -48,7 +50,7 @@ impl Config {
     fn new(version: String) -> Self {
         Self {
             version,
-            mute_role_id: None,
+            mute_role_id: Some(RoleId(818097980493660170)),
             general_channel_id: None
         }
     }
@@ -134,6 +136,11 @@ struct Activity;
 #[commands(slow_mode)]
 struct Owner;
 
+#[group]
+#[owners_only]
+#[commands(mute, unmute)]
+struct Mute;
+
 struct Handler;
 
 #[async_trait]
@@ -198,6 +205,28 @@ impl EventHandler for Handler {
     }
 }
 
+#[hook]
+async fn after(_ctx: &Context, _msg: &Message, command_name: &str, command_result: CommandResult) {
+    match command_result {
+        Ok(()) => info!("Processed command '{}'", command_name),
+        Err(why) => error!("Command '{}' returned error {:?}", command_name, why),
+    }
+}
+
+#[hook]
+async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) {
+    if let DispatchError::Ratelimited(info) = error {
+
+        // We notify them only once.
+        if info.is_first_try {
+            let _ = msg
+                .channel_id
+                .say(&ctx.http, &format!("Try this again in {} seconds.", info.as_secs()))
+                .await;
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -248,22 +277,22 @@ async fn main() {
             // are owners only.
             .owners(owners)
         )
-
         // Can't be used more than once per 5 seconds:
         .bucket("emoji", |b| b.delay(5)).await
-        // The `#[group]` macro generates `static` instances of the options set for the group.
-        // They're made in the pattern: `#name_GROUP` for the group instance and `#name_GROUP_OPTIONS`.
-        // #name is turned all uppercase
+        .after(after)
+        .on_dispatch_error(dispatch_error)
         .help(&MY_HELP)
         .group(&GENERAL_GROUP)
         .group(&SYSTEMS_GROUP)
         .group(&EMOJI_GROUP)
         .group(&OWNER_GROUP)
-        .group(&ACTIVITY_GROUP);
+        .group(&ACTIVITY_GROUP)
+        .group(&MUTE_GROUP);
 
     let mut client = Client::builder(token)
         .event_handler(Handler)
         .framework(framework)
+        .intents(GatewayIntents::all())
         .await
         .expect("Error creating client");
     
