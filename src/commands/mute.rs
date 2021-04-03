@@ -67,7 +67,7 @@ async fn muted(ctx: &Context, msg: &Message) -> CommandResult {
         .filter(|(_, member)| member.roles.contains(&mute_role_id))
         .map(|(_, member)| member.to_string())
         .collect::<Vec<String>>();
-    
+
     let message = if members.len() > 0 {
         format!("Currently muted members: {}", members.join(", "))
     } else {
