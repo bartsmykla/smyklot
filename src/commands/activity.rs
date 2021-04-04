@@ -19,7 +19,7 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     for user in &msg.mentions {
         name = name
             .replace(user.to_string().as_str(), user.name.as_str())
-            .replace(format!("<!@{}>", user.id), user.name.as_str());
+            .replace(format!("<!@{}>", user.id).as_str(), user.name.as_str());
     }
     
     ctx.set_activity(Activity::playing(&name)).await;
