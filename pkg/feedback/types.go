@@ -1,20 +1,20 @@
 package feedback
 
-// FeedbackType represents the type of feedback
-type FeedbackType string
+// Type represents the type of feedback
+type Type string
 
 const (
 	// Success represents a successful operation
 	// Response: Emoji reaction only (✅)
-	Success FeedbackType = "success"
+	Success Type = "success"
 
 	// Error represents a failed operation
 	// Response: Emoji reaction (❌) + detailed comment explaining the error
-	Error FeedbackType = "error"
+	Error Type = "error"
 
 	// Warning represents a non-critical issue
 	// Response: Emoji reaction (⚠️) + informative comment
-	Warning FeedbackType = "warning"
+	Warning Type = "warning"
 )
 
 // Feedback represents a response to a command
@@ -23,7 +23,7 @@ const (
 // Error/Warning feedback: Emoji reaction + comment with details
 type Feedback struct {
 	// Type is the feedback type (success, error, or warning)
-	Type FeedbackType
+	Type Type
 
 	// Emoji is the emoji used for the reaction
 	Emoji string

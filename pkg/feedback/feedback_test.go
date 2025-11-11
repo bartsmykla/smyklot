@@ -8,17 +8,17 @@ import (
 )
 
 var _ = Describe("Feedback System [Unit]", func() {
-	Describe("FeedbackType", func() {
+	Describe("Type", func() {
 		It("should have Success type", func() {
-			Expect(feedback.Success).To(Equal(feedback.FeedbackType("success")))
+			Expect(feedback.Success).To(Equal(feedback.Type("success")))
 		})
 
 		It("should have Error type", func() {
-			Expect(feedback.Error).To(Equal(feedback.FeedbackType("error")))
+			Expect(feedback.Error).To(Equal(feedback.Type("error")))
 		})
 
 		It("should have Warning type", func() {
-			Expect(feedback.Warning).To(Equal(feedback.FeedbackType("warning")))
+			Expect(feedback.Warning).To(Equal(feedback.Type("warning")))
 		})
 	})
 

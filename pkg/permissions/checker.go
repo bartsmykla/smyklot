@@ -1,3 +1,7 @@
+// Package permissions provides CODEOWNERS-based authorization for Smyklot.
+//
+// It validates user permissions by parsing .github/CODEOWNERS files and
+// checking if users have approval rights for repository changes.
 package permissions
 
 import (
@@ -69,7 +73,7 @@ func NewChecker(repoPath string) (*Checker, error) {
 // Phase 2 (future): Scoped permissions
 //   - Check path-specific OWNERS files
 //   - Support hierarchical permission resolution
-func (c *Checker) CanApprove(username, path string) (bool, error) {
+func (c *Checker) CanApprove(username, _ string) (bool, error) {
 	if username == "" {
 		return false, nil
 	}

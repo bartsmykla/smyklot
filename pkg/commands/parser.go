@@ -1,3 +1,7 @@
+// Package commands provides command parsing for Smyklot PR comments.
+//
+// It supports parsing slash commands (/approve, /merge) and mention commands
+// (@smyklot approve, @smyklot merge) from GitHub PR comment text.
 package commands
 
 import (

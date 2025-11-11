@@ -1,3 +1,7 @@
+// Package feedback provides user-facing messages for Smyklot operations.
+//
+// It creates formatted feedback messages with emoji and Markdown text for
+// success, error, and warning scenarios during PR approval and merge operations.
 package feedback
 
 import (
@@ -250,6 +254,7 @@ func (f *Feedback) String() string {
 	if f.Message == "" {
 		return f.Emoji
 	}
+
 	return fmt.Sprintf("%s\n\n%s", f.Emoji, f.Message)
 }
 

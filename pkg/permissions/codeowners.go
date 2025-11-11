@@ -1,3 +1,7 @@
+// Package permissions provides CODEOWNERS file parsing.
+//
+// This file provides parsing functionality for GitHub CODEOWNERS format,
+// extracting ownership patterns and associated users/teams.
 package permissions
 
 import (
@@ -28,7 +32,7 @@ func ParseCodeownersFile(filePath string) (*CodeownersFile, error) {
 	}
 
 	// Read the file
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) //nolint:gosec // File path is validated by caller
 	if err != nil {
 		return nil, NewParseError(ErrReadFailed, filePath, err)
 	}
@@ -96,6 +100,7 @@ func (c *CodeownersFile) GetGlobalOwners() []string {
 			return entry.Owners
 		}
 	}
+
 	return []string{}
 }
 

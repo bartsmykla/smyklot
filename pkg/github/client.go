@@ -1,3 +1,7 @@
+// Package github provides a GitHub API client for Smyklot operations.
+//
+// It supports PR operations (approve, merge, info), comment posting, and
+// emoji reactions through the GitHub REST API v3.
 package github
 
 import (
