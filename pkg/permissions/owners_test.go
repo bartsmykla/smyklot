@@ -1,6 +1,7 @@
 package permissions_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -158,7 +159,7 @@ approvers:
 
 				_, err = permissions.ParseOwnersFile(ownersPath)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("invalid YAML"))
+				Expect(errors.Is(err, permissions.ErrInvalidYAML)).To(BeTrue())
 			})
 
 			It("should return error for non-YAML content", func() {
@@ -191,7 +192,7 @@ approvers:
 
 				_, err := permissions.ParseOwnersFile(ownersPath)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("failed to read OWNERS file"))
+				Expect(errors.Is(err, permissions.ErrReadFailed)).To(BeTrue())
 			})
 
 			It("should return error for directory instead of file", func() {
@@ -201,12 +202,13 @@ approvers:
 
 				_, err = permissions.ParseOwnersFile(dirPath)
 				Expect(err).To(HaveOccurred())
+				Expect(errors.Is(err, permissions.ErrReadFailed)).To(BeTrue())
 			})
 
 			It("should return error for empty file path", func() {
 				_, err := permissions.ParseOwnersFile("")
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("empty file path"))
+				Expect(errors.Is(err, permissions.ErrEmptyFilePath)).To(BeTrue())
 			})
 		})
 
