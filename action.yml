@@ -1,0 +1,26 @@
+name: Smyklot PR Commands
+description: GitHub Actions bot for automated PR approvals and merges based on CODEOWNERS
+author: Bart Smykla
+
+branding:
+  icon: check-circle
+  color: green
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+      with:
+        go-version-file: ${{ github.action_path }}/go.mod
+        cache-dependency-path: ${{ github.action_path }}/go.sum
+
+    - name: Build smyklot binary
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        go build -o ${{ runner.temp }}/smyklot-github-action ./cmd/github-action
+
+    - name: Execute command
+      shell: bash
+      run: ${{ runner.temp }}/smyklot-github-action
