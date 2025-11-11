@@ -26,6 +26,8 @@ Path-specific patterns will be supported in Phase 2.
 
 Create `.github/workflows/pr-commands.yml`:
 
+**Option A: Using GITHUB_TOKEN (simpler, comments from workflow user)**
+
 ```yaml
 name: PR Commands
 
@@ -59,7 +61,72 @@ jobs:
           COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
 ```
 
-### 3. Commit and Push
+**Option B: Using GitHub App (recommended, comments from app)**
+
+```yaml
+name: PR Commands
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  handle-command:
+    name: Handle PR Command
+    if: github.event.issue.pull_request
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Run Smyklot
+        uses: bartsmykla/smyklot@feat/go-rewrite-github-app
+        env:
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+```
+
+### 3. (Optional) Configure GitHub App Authentication
+
+**Only needed if using Option B workflow above.**
+
+To have comments appear from the GitHub App instead of the default
+`GITHUB_TOKEN` user:
+
+1. **Create or use existing GitHub App**:
+   - Go to Settings → Developer settings → GitHub Apps
+   - Note the App ID
+   - Generate and download a private key (.pem file)
+   - Install the app on your repository
+
+2. **Add App ID as variable and private key as secret**:
+   ```bash
+   gh variable set APP_ID --body "1197525"
+   gh secret set APP_PRIVATE_KEY < path/to/private-key.pem
+   ```
+
+**Note**: The `actions/create-github-app-token` action automatically
+detects the installation ID, so you don't need to configure it
+separately.
+
+### 4. Commit and Push
 
 ```bash
 git add .github/CODEOWNERS .github/workflows/pr-commands.yml
@@ -67,7 +134,7 @@ git commit -sS -m "feat(ci): add Smyklot PR command automation"
 git push
 ```
 
-### 4. Test the Deployment
+### 5. Test the Deployment
 
 Create a test pull request and try the commands:
 
