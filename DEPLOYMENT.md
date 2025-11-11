@@ -119,7 +119,11 @@ To have comments appear from the GitHub App instead of the default
 2. **Add App ID as variable and private key as secret**:
    ```bash
    gh variable set APP_ID --body "1197525"
-   gh secret set APP_PRIVATE_KEY < path/to/private-key.pem
+   # Private key must be in PKCS#8 format (starts with "-----BEGIN PRIVATE KEY-----")
+   # If your key is in OpenSSH format, convert it first:
+   # ssh-keygen -p -N "" -m pem -f openssh-key.pem
+   # openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in openssh-key.pem -out pkcs8-key.pem
+   gh secret set APP_PRIVATE_KEY < pkcs8-key.pem
    ```
 
 **Note**: The `actions/create-github-app-token` action automatically
