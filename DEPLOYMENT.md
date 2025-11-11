@@ -43,7 +43,14 @@ permissions:
 jobs:
   handle-command:
     name: Handle PR Command
-    if: github.event.issue.pull_request
+    if: |
+      github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
+      (
+        startsWith(github.event.comment.body, '/approve') ||
+        startsWith(github.event.comment.body, '/merge') ||
+        contains(github.event.comment.body, '@smyklot')
+      )
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -78,7 +85,14 @@ permissions:
 jobs:
   handle-command:
     name: Handle PR Command
-    if: github.event.issue.pull_request
+    if: |
+      github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
+      (
+        startsWith(github.event.comment.body, '/approve') ||
+        startsWith(github.event.comment.body, '/merge') ||
+        contains(github.event.comment.body, '@smyklot')
+      )
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
