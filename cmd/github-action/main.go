@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/jferrl/go-githubauth"
 	"github.com/spf13/cobra"
 
 	"github.com/bartsmykla/smyklot/pkg/commands"
@@ -19,42 +20,51 @@ import (
 )
 
 const (
-	envGitHubToken    = "GITHUB_TOKEN" //nolint:gosec // Environment variable name, not a credential
-	envCommentBody    = "COMMENT_BODY"
-	envCommentID      = "COMMENT_ID"
-	envPRNumber       = "PR_NUMBER"
-	envRepoOwner      = "REPO_OWNER"
-	envRepoName       = "REPO_NAME"
-	envCommentAuthor  = "COMMENT_AUTHOR"
-	rootPath          = "/"
-	emptyBaseURL      = ""
-	flagToken         = "token"
-	flagCommentBody   = "comment-body"
-	flagCommentID     = "comment-id"
-	flagPRNumber      = "pr-number"
-	flagRepoOwner     = "repo-owner"
-	flagRepoName      = "repo-name"
-	flagCommentAuthor = "comment-author"
-	descToken         = "GitHub API token" //nolint:gosec // Flag description, not a credential
-	descCommentBody   = "PR comment body"
-	descCommentID     = "PR comment ID"
-	descPRNumber      = "Pull request number"
-	descRepoOwner     = "Repository owner"
-	descRepoName      = "Repository name"
-	descCommentAuthor = "Comment author username"
-	errInvalidPRNum   = "invalid PR number"
-	errInvalidComment = "invalid comment ID"
+	envGitHubToken         = "GITHUB_TOKEN" //nolint:gosec // Environment variable name, not a credential
+	envCommentBody         = "COMMENT_BODY"
+	envCommentID           = "COMMENT_ID"
+	envPRNumber            = "PR_NUMBER"
+	envRepoOwner           = "REPO_OWNER"
+	envRepoName            = "REPO_NAME"
+	envCommentAuthor       = "COMMENT_AUTHOR"
+	envGitHubAppPrivateKey = "GITHUB_APP_PRIVATE_KEY" //nolint:gosec // Environment variable name, not a credential
+	envGitHubAppClientID   = "GITHUB_APP_CLIENT_ID"   //nolint:gosec // Environment variable name, not a credential
+	envGitHubAppID         = "GITHUB_APP_ID"          //nolint:gosec // Environment variable name, not a credential
+	envInstallationID      = "GITHUB_INSTALLATION_ID"
+	rootPath               = "/"
+	emptyBaseURL           = ""
+	flagToken              = "token"
+	flagCommentBody        = "comment-body"
+	flagCommentID          = "comment-id"
+	flagPRNumber           = "pr-number"
+	flagRepoOwner          = "repo-owner"
+	flagRepoName           = "repo-name"
+	flagCommentAuthor      = "comment-author"
+	descToken              = "GitHub API token" //nolint:gosec // Flag description, not a credential
+	descCommentBody        = "PR comment body"
+	descCommentID          = "PR comment ID"
+	descPRNumber           = "Pull request number"
+	descRepoOwner          = "Repository owner"
+	descRepoName           = "Repository name"
+	descCommentAuthor      = "Comment author username"
+	errInvalidPRNum        = "invalid PR number"
+	errInvalidComment      = "invalid comment ID"
+	errInvalidInstallID    = "invalid installation ID"
 )
 
 // Config holds the runtime configuration for the action.
 type Config struct {
-	Token         string
-	CommentBody   string
-	CommentID     string
-	PRNumber      string
-	RepoOwner     string
-	RepoName      string
-	CommentAuthor string
+	Token               string
+	CommentBody         string
+	CommentID           string
+	PRNumber            string
+	RepoOwner           string
+	RepoName            string
+	CommentAuthor       string
+	GitHubAppPrivateKey string
+	GitHubAppClientID   string
+	GitHubAppID         string
+	InstallationID      string
 }
 
 var config Config
@@ -109,8 +119,19 @@ func run(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	// Get GitHub App installation token if configured
+	token := config.Token
+	installationToken, err := getInstallationToken()
+	if err != nil {
+		return err
+	}
+
+	if installationToken != "" {
+		token = installationToken
+	}
+
 	// Create a GitHub client
-	client, err := github.NewClient(config.Token, emptyBaseURL)
+	client, err := github.NewClient(token, emptyBaseURL)
 	if err != nil {
 		return NewGitHubError(ErrGitHubClient, err)
 	}
@@ -189,6 +210,22 @@ func loadConfig() error {
 
 	if config.CommentAuthor == "" {
 		config.CommentAuthor = os.Getenv(envCommentAuthor)
+	}
+
+	if config.GitHubAppPrivateKey == "" {
+		config.GitHubAppPrivateKey = os.Getenv(envGitHubAppPrivateKey)
+	}
+
+	if config.GitHubAppClientID == "" {
+		config.GitHubAppClientID = os.Getenv(envGitHubAppClientID)
+	}
+
+	if config.GitHubAppID == "" {
+		config.GitHubAppID = os.Getenv(envGitHubAppID)
+	}
+
+	if config.InstallationID == "" {
+		config.InstallationID = os.Getenv(envInstallationID)
 	}
 
 	return nil
@@ -380,4 +417,54 @@ func postNotMergeable(client *github.Client, prNum, commentID int) error {
 	fb := feedback.NewNotMergeable()
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionWarning)
+}
+
+// getInstallationToken generates a GitHub App installation token if credentials are provided.
+//
+// Returns empty string if GitHub App credentials are not configured.
+// Returns the token on success.
+func getInstallationToken() (string, error) {
+	// Check if GitHub App credentials are provided
+	if config.GitHubAppPrivateKey == "" || config.InstallationID == "" {
+		return "", nil
+	}
+
+	// Determine which ID to use (ClientID is preferred, fallback to AppID)
+	clientID := config.GitHubAppClientID
+	if clientID == "" {
+		clientID = config.GitHubAppID
+	}
+
+	if clientID == "" {
+		return "", nil
+	}
+
+	// Convert installation ID to int64
+	installationID, err := strconv.ParseInt(config.InstallationID, 10, 64)
+	if err != nil {
+		return "", NewInputError(ErrInvalidInput, config.InstallationID, errInvalidInstallID)
+	}
+
+	// Create GitHub App JWT token source
+	appTokenSource, err := githubauth.NewApplicationTokenSource(
+		clientID,
+		[]byte(config.GitHubAppPrivateKey),
+	)
+	if err != nil {
+		return "", NewGitHubError(ErrGitHubAppAuth, err)
+	}
+
+	// Create the installation token source
+	installationTokenSource := githubauth.NewInstallationTokenSource(
+		installationID,
+		appTokenSource,
+	)
+
+	// Get the installation token
+	token, err := installationTokenSource.Token()
+	if err != nil {
+		return "", NewGitHubError(ErrGitHubAppAuth, err)
+	}
+
+	return token.AccessToken, nil
 }

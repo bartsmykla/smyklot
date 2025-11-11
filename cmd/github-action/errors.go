@@ -16,6 +16,9 @@ var (
 	// ErrGitHubClient is returned when GitHub client creation fails
 	ErrGitHubClient = errors.New("GitHub client error")
 
+	// ErrGitHubAppAuth is returned when GitHub App authentication fails
+	ErrGitHubAppAuth = errors.New("GitHub App authentication failed")
+
 	// ErrPermissionCheck is returned when the permission check fails
 	ErrPermissionCheck = errors.New("permission check failed")
 
