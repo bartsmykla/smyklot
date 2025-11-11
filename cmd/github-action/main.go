@@ -7,7 +7,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
@@ -17,6 +16,34 @@ import (
 	"github.com/bartsmykla/smyklot/pkg/feedback"
 	"github.com/bartsmykla/smyklot/pkg/github"
 	"github.com/bartsmykla/smyklot/pkg/permissions"
+)
+
+const (
+	envGitHubToken    = "GITHUB_TOKEN"         //nolint:gosec // Environment variable name, not a credential
+	envCommentBody    = "COMMENT_BODY"
+	envCommentID      = "COMMENT_ID"
+	envPRNumber       = "PR_NUMBER"
+	envRepoOwner      = "REPO_OWNER"
+	envRepoName       = "REPO_NAME"
+	envCommentAuthor  = "COMMENT_AUTHOR"
+	rootPath          = "/"
+	emptyBaseURL      = ""
+	flagToken         = "token"
+	flagCommentBody   = "comment-body"
+	flagCommentID     = "comment-id"
+	flagPRNumber      = "pr-number"
+	flagRepoOwner     = "repo-owner"
+	flagRepoName      = "repo-name"
+	flagCommentAuthor = "comment-author"
+	descToken         = "GitHub API token"     //nolint:gosec // Flag description, not a credential
+	descCommentBody   = "PR comment body"
+	descCommentID     = "PR comment ID"
+	descPRNumber      = "Pull request number"
+	descRepoOwner     = "Repository owner"
+	descRepoName      = "Repository name"
+	descCommentAuthor = "Comment author username"
+	errInvalidPRNum   = "invalid PR number"
+	errInvalidComment = "invalid comment ID"
 )
 
 // Config holds the runtime configuration for the action.
@@ -45,13 +72,13 @@ commands like /approve and /merge based on user permissions.`,
 
 func init() {
 	// Define CLI flags that can override environment variables
-	rootCmd.Flags().StringVar(&config.Token, "token", "", "GitHub API token")
-	rootCmd.Flags().StringVar(&config.CommentBody, "comment-body", "", "PR comment body")
-	rootCmd.Flags().StringVar(&config.CommentID, "comment-id", "", "PR comment ID")
-	rootCmd.Flags().StringVar(&config.PRNumber, "pr-number", "", "Pull request number")
-	rootCmd.Flags().StringVar(&config.RepoOwner, "repo-owner", "", "Repository owner")
-	rootCmd.Flags().StringVar(&config.RepoName, "repo-name", "", "Repository name")
-	rootCmd.Flags().StringVar(&config.CommentAuthor, "comment-author", "", "Comment author username")
+	rootCmd.Flags().StringVar(&config.Token, flagToken, "", descToken)
+	rootCmd.Flags().StringVar(&config.CommentBody, flagCommentBody, "", descCommentBody)
+	rootCmd.Flags().StringVar(&config.CommentID, flagCommentID, "", descCommentID)
+	rootCmd.Flags().StringVar(&config.PRNumber, flagPRNumber, "", descPRNumber)
+	rootCmd.Flags().StringVar(&config.RepoOwner, flagRepoOwner, "", descRepoOwner)
+	rootCmd.Flags().StringVar(&config.RepoName, flagRepoName, "", descRepoName)
+	rootCmd.Flags().StringVar(&config.CommentAuthor, flagCommentAuthor, "", descCommentAuthor)
 }
 
 func main() {
@@ -79,7 +106,7 @@ func run(_ *cobra.Command, _ []string) error {
 	}
 
 	// Create GitHub client
-	client, err := github.NewClient(config.Token, "")
+	client, err := github.NewClient(config.Token, emptyBaseURL)
 	if err != nil {
 		return NewGitHubError(ErrGitHubClient, err)
 	}
@@ -87,27 +114,28 @@ func run(_ *cobra.Command, _ []string) error {
 	// Get current working directory (repository root)
 	repoPath, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return NewGitHubError(ErrGetWorkingDirectory, err)
 	}
 
 	// Initialize permission checker
 	checker, err := permissions.NewChecker(repoPath)
 	if err != nil {
-		return fmt.Errorf("failed to initialize permission checker: %w", err)
+		return NewGitHubError(ErrInitPermissions, err)
 	}
 
 	// Convert string IDs to integers
 	prNum, err := strconv.Atoi(config.PRNumber)
 	if err != nil {
-		return NewInputError(ErrInvalidInput, config.PRNumber, "invalid PR number")
+		return NewInputError(ErrInvalidInput, config.PRNumber, errInvalidPRNum)
 	}
+
 	commentIDNum, err := strconv.Atoi(config.CommentID)
 	if err != nil {
-		return NewInputError(ErrInvalidInput, config.CommentID, "invalid comment ID")
+		return NewInputError(ErrInvalidInput, config.CommentID, errInvalidComment)
 	}
 
 	// Check if the user has permission to execute this command
-	canApprove, err := checker.CanApprove(config.CommentAuthor, "/")
+	canApprove, err := checker.CanApprove(config.CommentAuthor, rootPath)
 	if err != nil {
 		return NewGitHubError(ErrPermissionCheck, err)
 	}
@@ -132,31 +160,31 @@ func run(_ *cobra.Command, _ []string) error {
 // loadConfig loads configuration from environment variables if not set via flags.
 func loadConfig() error {
 	if config.Token == "" {
-		config.Token = os.Getenv("GITHUB_TOKEN")
+		config.Token = os.Getenv(envGitHubToken)
 	}
 
 	if config.CommentBody == "" {
-		config.CommentBody = os.Getenv("COMMENT_BODY")
+		config.CommentBody = os.Getenv(envCommentBody)
 	}
 
 	if config.CommentID == "" {
-		config.CommentID = os.Getenv("COMMENT_ID")
+		config.CommentID = os.Getenv(envCommentID)
 	}
 
 	if config.PRNumber == "" {
-		config.PRNumber = os.Getenv("PR_NUMBER")
+		config.PRNumber = os.Getenv(envPRNumber)
 	}
 
 	if config.RepoOwner == "" {
-		config.RepoOwner = os.Getenv("REPO_OWNER")
+		config.RepoOwner = os.Getenv(envRepoOwner)
 	}
 
 	if config.RepoName == "" {
-		config.RepoName = os.Getenv("REPO_NAME")
+		config.RepoName = os.Getenv(envRepoName)
 	}
 
 	if config.CommentAuthor == "" {
-		config.CommentAuthor = os.Getenv("COMMENT_AUTHOR")
+		config.CommentAuthor = os.Getenv(envCommentAuthor)
 	}
 
 	return nil
@@ -165,31 +193,31 @@ func loadConfig() error {
 // validateConfig validates that all required configuration is present.
 func validateConfig() error {
 	if config.Token == "" {
-		return NewEnvVarError(ErrMissingEnvVar, "GITHUB_TOKEN")
+		return NewEnvVarError(ErrMissingEnvVar, envGitHubToken)
 	}
 
 	if config.CommentBody == "" {
-		return NewEnvVarError(ErrMissingEnvVar, "COMMENT_BODY")
+		return NewEnvVarError(ErrMissingEnvVar, envCommentBody)
 	}
 
 	if config.CommentID == "" {
-		return NewEnvVarError(ErrMissingEnvVar, "COMMENT_ID")
+		return NewEnvVarError(ErrMissingEnvVar, envCommentID)
 	}
 
 	if config.PRNumber == "" {
-		return NewEnvVarError(ErrMissingEnvVar, "PR_NUMBER")
+		return NewEnvVarError(ErrMissingEnvVar, envPRNumber)
 	}
 
 	if config.RepoOwner == "" {
-		return NewEnvVarError(ErrMissingEnvVar, "REPO_OWNER")
+		return NewEnvVarError(ErrMissingEnvVar, envRepoOwner)
 	}
 
 	if config.RepoName == "" {
-		return NewEnvVarError(ErrMissingEnvVar, "REPO_NAME")
+		return NewEnvVarError(ErrMissingEnvVar, envRepoName)
 	}
 
 	if config.CommentAuthor == "" {
-		return NewEnvVarError(ErrMissingEnvVar, "COMMENT_AUTHOR")
+		return NewEnvVarError(ErrMissingEnvVar, envCommentAuthor)
 	}
 
 	return nil

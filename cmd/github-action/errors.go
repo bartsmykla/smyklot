@@ -7,16 +7,18 @@ import (
 
 // Sentinel errors for common failure cases.
 var (
-	ErrMissingEnvVar    = errors.New("required environment variable is missing")
-	ErrInvalidInput     = errors.New("invalid input provided")
-	ErrGitHubClient     = errors.New("GitHub client error")
-	ErrPermissionCheck  = errors.New("permission check failed")
-	ErrCommandExecution = errors.New("command execution failed")
-	ErrPostComment      = errors.New("failed to post comment")
-	ErrAddReaction      = errors.New("failed to add reaction")
-	ErrApprovePR        = errors.New("failed to approve PR")
-	ErrMergePR          = errors.New("failed to merge PR")
-	ErrGetPRInfo        = errors.New("failed to get PR info")
+	ErrMissingEnvVar       = errors.New("required environment variable is missing")
+	ErrInvalidInput        = errors.New("invalid input provided")
+	ErrGitHubClient        = errors.New("GitHub client error")
+	ErrPermissionCheck     = errors.New("permission check failed")
+	ErrCommandExecution    = errors.New("command execution failed")
+	ErrPostComment         = errors.New("failed to post comment")
+	ErrAddReaction         = errors.New("failed to add reaction")
+	ErrApprovePR           = errors.New("failed to approve PR")
+	ErrMergePR             = errors.New("failed to merge PR")
+	ErrGetPRInfo           = errors.New("failed to get PR info")
+	ErrGetWorkingDirectory = errors.New("failed to get working directory")
+	ErrInitPermissions     = errors.New("failed to initialize permissions")
 )
 
 // EnvVarError represents an error related to environment variable validation.
