@@ -21,10 +21,6 @@ output: prefixed
 silent: true
 
 vars:
-  GO_FILES:
-    sh: find . -name "*.go" -not -path "./vendor/*" -type f
-  GO_PACKAGES:
-    sh: go list ./...
   COVERAGE_DIR: coverage
 
 tasks:
@@ -35,8 +31,7 @@ tasks:
   default:
     desc: Show available tasks
     aliases: [ls, list]
-    cmds:
-      - task --list
+    cmd: task --list
 
   # ==========================================================================
   # Testing
@@ -45,7 +40,7 @@ tasks:
   test:
     desc: Run all tests
     summary: |
-      Run comprehensive test suite:
+      Run a comprehensive test suite:
       - Unit tests
       - Integration tests
       - Coverage report (80% minimum)
@@ -54,24 +49,23 @@ tasks:
       - mkdir -p {{.COVERAGE_DIR}}
       - ginkgo -r --cover --race --coverprofile={{.COVERAGE_DIR}}/coverage.out
       - go tool cover -html={{.COVERAGE_DIR}}/coverage.out -o {{.COVERAGE_DIR}}/coverage.html
-      - echo "✓ Tests passed - Coverage report: {{.COVERAGE_DIR}}/coverage.html"
+      - echo "✓ Tests passed - Coverage report{{":"}} {{.COVERAGE_DIR}}/coverage.html"
 
   test:unit:
     desc: Run unit tests only
     cmds:
       - echo "▶ Running unit tests"
-      - ginkgo -r --focus "Unit" --cover --race
+      - ginkgo -r --focus Unit --cover --race
 
   test:integration:
     desc: Run integration tests only
     cmds:
       - echo "▶ Running integration tests"
-      - ginkgo -r --focus "Integration" --cover --race
+      - ginkgo -r --focus Integration --cover --race
 
   test:watch:
     desc: Run tests in watch mode
-    cmds:
-      - ginkgo watch -r
+    cmd: ginkgo watch -r
 
   # ==========================================================================
   # Linting
@@ -88,8 +82,7 @@ tasks:
       - lint:go
       - lint:markdown
       - lint:mod
-    cmds:
-      - echo "✅ All linters passed!"
+    cmd: echo "✅ All linters passed!"
 
   lint:go:
     desc: Lint Go code
@@ -131,8 +124,7 @@ tasks:
 
   security:gosec:
     desc: Run gosec security scanner
-    cmds:
-      - gosec ./...
+    cmd: gosec ./...
 
   # ==========================================================================
   # Building
@@ -142,8 +134,7 @@ tasks:
     desc: Build all binaries
     deps:
       - build:github-action
-    cmds:
-      - echo "✓ All binaries built"
+    cmd: echo "✓ All binaries built"
 
   build:github-action:
     desc: Build GitHub Actions entrypoint
@@ -179,8 +170,7 @@ tasks:
 
   deps:tidy:
     desc: Clean up go.mod and go.sum
-    cmds:
-      - go mod tidy
+    cmd: go mod tidy
 
   # ==========================================================================
   # Code Generation
@@ -188,8 +178,7 @@ tasks:
 
   generate:
     desc: Run go generate
-    cmds:
-      - go generate ./...
+    cmd: go generate ./...
 
   # ==========================================================================
   # Cleanup
@@ -208,7 +197,7 @@ tasks:
   # ==========================================================================
 
   dev:setup:
-    desc: Set up development environment
+    desc: Set up a development environment
     cmds:
       - echo "▶ Setting up development environment"
       - mise install
@@ -217,7 +206,7 @@ tasks:
       - echo "✓ Development environment ready"
 
   test:setup:
-    desc: Set up test framework
+    desc: Set up the test framework
     cmds:
       - echo "▶ Installing test dependencies"
       - go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -235,7 +224,7 @@ tasks:
     cmds:
       - echo "▶ Formatting Go code"
       - go fmt ./...
-      - gofmt -s -w {{.GO_FILES}}
+      - gofmt -s -w .
       - echo "✓ Code formatted"
 
   # ==========================================================================
@@ -266,9 +255,18 @@ tasks:
 
   info:
     desc: Show project information
+    vars:
+      MODULE:
+        sh: go list -m
+      GO_VERSION:
+        sh: go version
+      PACKAGE_COUNT:
+        sh: go list ./... | wc -l | tr -d ' '
+      FILE_COUNT:
+        sh: find . -name '*.go' -not -path './vendor/*' | wc -l | tr -d ' '
     cmds:
-      - echo "Project: smyklot"
-      - echo "Module: $(go list -m)"
-      - echo "Go version: $(go version)"
-      - echo "Packages: $(go list ./... | wc -l)"
-      - echo "Files: $(find . -name '*.go' -not -path './vendor/*' | wc -l)"
+      - echo "Project{{":"}} smyklot"
+      - echo "Module{{":"}} {{.MODULE}}"
+      - echo "Go version{{":"}} {{.GO_VERSION}}"
+      - echo "Packages{{":"}} {{.PACKAGE_COUNT}}"
+      - echo "Files{{":"}} {{.FILE_COUNT}}"
