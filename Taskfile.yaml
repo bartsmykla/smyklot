@@ -47,7 +47,7 @@ tasks:
     cmds:
       - echo "▶ Running tests"
       - mkdir -p {{.COVERAGE_DIR}}
-      - ginkgo -r --cover --race --coverprofile={{.COVERAGE_DIR}}/coverage.out
+      - ginkgo -r --cover --race --output-dir={{.COVERAGE_DIR}} --coverprofile=coverage.out
       - go tool cover -html={{.COVERAGE_DIR}}/coverage.out -o {{.COVERAGE_DIR}}/coverage.html
       - echo "✓ Tests passed - Coverage report{{":"}} {{.COVERAGE_DIR}}/coverage.html"
 
