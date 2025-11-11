@@ -1,7 +1,8 @@
-### Smyklot bot
-Bot Bartlomieja Smykly
+# Smyklot
 
-### To run - locally
+GitHub App for automated PR approvals based on OWNERS files
+
+## To run - locally
 
 1. Create app on discord dev portal
 2. Create a bot

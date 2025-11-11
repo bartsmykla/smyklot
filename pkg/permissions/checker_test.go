@@ -22,7 +22,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 
 	AfterEach(func() {
 		if tempDir != "" {
-			os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempDir)
 		}
 	})
 

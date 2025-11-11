@@ -21,7 +21,7 @@ output: prefixed
 silent: true
 
 vars:
-  COVERAGE_DIR: coverage
+  COVERAGE_DIR: tmp/coverage
 
 tasks:
   # ==========================================================================
