@@ -130,12 +130,12 @@ var _ = Describe("Feedback System [Unit]", func() {
 		})
 	})
 
-	Describe("NewNoOWNERSFile", func() {
-		It("should create error feedback for missing OWNERS file", func() {
-			fb := feedback.NewNoOWNERSFile()
+	Describe("NewNoCodeownersFile", func() {
+		It("should create error feedback for missing CODEOWNERS file", func() {
+			fb := feedback.NewNoCodeownersFile()
 			Expect(fb.Type).To(Equal(feedback.Error))
 			Expect(fb.Emoji).To(Equal("❌"))
-			Expect(fb.Message).To(ContainSubstring("OWNERS"))
+			Expect(fb.Message).To(ContainSubstring("CODEOWNERS"))
 			Expect(fb.Message).To(ContainSubstring("not found"))
 		})
 	})

@@ -5,24 +5,25 @@ import (
 	"path/filepath"
 )
 
-// Checker validates user permissions based on OWNERS files.
+// Checker validates user permissions based on CODEOWNERS files
 //
-// Phase 1: Root OWNERS file support only
-//   - Users listed in root OWNERS can approve any changes
-//   - No scoped permissions (future enhancement)
+// Phase 1: Global CODEOWNERS support only
+//   - Uses .github/CODEOWNERS file (GitHub standard)
+//   - Users listed as global owners (*) can approve any changes
+//   - No path-specific permissions (future enhancement)
 //
-// Phase 2 (future): Scoped OWNERS files
-//   - Support per-directory OWNERS files
+// Phase 2 (future): Path-specific permissions
+//   - Support path-specific ownership patterns
 //   - Users can approve changes in their scope
 type Checker struct {
 	repoPath      string
 	rootApprovers []string
 }
 
-// NewChecker creates a new permission checker for the given repository path.
+// NewChecker creates a new permission checker for the given repository path
 //
-// The checker loads the root OWNERS file if it exists. If no OWNERS file
-// exists, all permission checks will return false.
+// The checker loads the .github/CODEOWNERS file if it exists. If no
+// CODEOWNERS file exists, all permission checks will return false.
 //
 // Returns an error if:
 //   - The repository path is empty
@@ -42,17 +43,17 @@ func NewChecker(repoPath string) (*Checker, error) {
 		rootApprovers: []string{},
 	}
 
-	// Try to load root OWNERS file
-	ownersPath := filepath.Join(repoPath, "OWNERS")
-	if _, err := os.Stat(ownersPath); err == nil {
-		owners, err := ParseOwnersFile(ownersPath)
+	// Try to load .github/CODEOWNERS file
+	codeownersPath := filepath.Join(repoPath, ".github", "CODEOWNERS")
+	if _, err := os.Stat(codeownersPath); err == nil {
+		codeowners, err := ParseCodeownersFile(codeownersPath)
 		if err != nil {
-			// If the OWNERS file exists but cannot be parsed, treat it as
+			// If the CODEOWNERS file exists but cannot be parsed, treat it as
 			// having no approvers. This is a soft failure to avoid blocking
 			// operations due to syntax errors.
 			return checker, nil
 		}
-		checker.rootApprovers = owners.Approvers
+		checker.rootApprovers = codeowners.GetGlobalOwners()
 	}
 
 	return checker, nil

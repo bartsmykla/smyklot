@@ -12,11 +12,8 @@ var (
 	// ErrEmptyFilePath is returned when an empty file path is provided
 	ErrEmptyFilePath = errors.New("empty file path provided")
 
-	// ErrReadFailed is returned when reading the OWNERS file fails
-	ErrReadFailed = errors.New("failed to read the OWNERS file")
-
-	// ErrInvalidYAML is returned when the OWNERS file contains invalid YAML syntax
-	ErrInvalidYAML = errors.New("invalid YAML syntax in the OWNERS file")
+	// ErrReadFailed is returned when reading the CODEOWNERS file fails
+	ErrReadFailed = errors.New("failed to read the CODEOWNERS file")
 
 	// ErrEmptyRepoPath is returned when an empty repository path is provided
 	ErrEmptyRepoPath = errors.New("empty repository path provided")
@@ -25,7 +22,7 @@ var (
 	ErrRepoPathNotExist = errors.New("repository path does not exist")
 )
 
-// ParseError represents an error that occurred during OWNERS file parsing
+// ParseError represents an error that occurred during CODEOWNERS file parsing
 type ParseError struct {
 	Op       error
 	FilePath string

@@ -1,13 +1,21 @@
 package permissions
 
-// OwnersFile represents the structure of an OWNERS file
-type OwnersFile struct {
-	// Approvers is a list of GitHub usernames who can approve changes
-	Approvers []string `yaml:"approvers"`
+// CodeownersFile represents a parsed CODEOWNERS file
+type CodeownersFile struct {
+	// Path is the file path to the CODEOWNERS file
+	Path string
 
-	// Path is the directory path this OWNERS file applies to
-	// An empty string indicates the root OWNERS file
-	Path string `yaml:"-"`
+	// Entries contains all parsed ownership entries
+	Entries []CodeownersEntry
+}
+
+// CodeownersEntry represents a single line in a CODEOWNERS file
+type CodeownersEntry struct {
+	// Pattern is the file/directory pattern (e.g., "*", "*.js", "/docs/")
+	Pattern string
+
+	// Owners is the list of owners for this pattern (without @ prefix)
+	Owners []string
 }
 
 // PermissionScope represents the scope of a user's permissions

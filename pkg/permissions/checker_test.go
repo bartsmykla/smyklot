@@ -49,35 +49,35 @@ var _ = Describe("Permission Checker [Unit]", func() {
 	Describe("CanApprove", func() {
 		var checker *permissions.Checker
 
-		Context("when root OWNERS file exists", func() {
+		Context("when CODEOWNERS file exists", func() {
 			BeforeEach(func() {
-				// Create root OWNERS file
-				content := `approvers:
-  - admin1
-  - admin2
-  - root-user
-`
-				ownersPath := filepath.Join(tempDir, "OWNERS")
-				err := os.WriteFile(ownersPath, []byte(content), 0600)
+				// Create .github/CODEOWNERS file
+				githubDir := filepath.Join(tempDir, ".github")
+				err := os.MkdirAll(githubDir, 0755)
+				Expect(err).NotTo(HaveOccurred())
+
+				content := `* @admin1 @admin2 @root-user`
+				codeownersPath := filepath.Join(githubDir, "CODEOWNERS")
+				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
 				checker, err = permissions.NewChecker(tempDir)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("should allow root approver to approve", func() {
+			It("should allow global owner to approve", func() {
 				canApprove, err := checker.CanApprove("admin1", "/any/path")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(canApprove).To(BeTrue())
 			})
 
-			It("should allow another root approver to approve", func() {
+			It("should allow another global owner to approve", func() {
 				canApprove, err := checker.CanApprove("root-user", "/any/path")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(canApprove).To(BeTrue())
 			})
 
-			It("should deny non-approver", func() {
+			It("should deny non-owner", func() {
 				canApprove, err := checker.CanApprove("random-user", "/any/path")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(canApprove).To(BeFalse())
@@ -114,34 +114,37 @@ var _ = Describe("Permission Checker [Unit]", func() {
 			})
 		})
 
-		Context("when root OWNERS file does not exist", func() {
+		Context("when CODEOWNERS file does not exist", func() {
 			BeforeEach(func() {
 				var err error
 				checker, err = permissions.NewChecker(tempDir)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("should deny all users when no OWNERS file exists", func() {
+			It("should deny all users when no CODEOWNERS file exists", func() {
 				canApprove, err := checker.CanApprove("any-user", "/any/path")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(canApprove).To(BeFalse())
 			})
 		})
 
-		Context("when root OWNERS file has empty approvers list", func() {
+		Context("when CODEOWNERS file has empty owners list", func() {
 			BeforeEach(func() {
-				// Create OWNERS file with empty approvers
-				content := `approvers: []
-`
-				ownersPath := filepath.Join(tempDir, "OWNERS")
-				err := os.WriteFile(ownersPath, []byte(content), 0600)
+				// Create CODEOWNERS with no global owners
+				githubDir := filepath.Join(tempDir, ".github")
+				err := os.MkdirAll(githubDir, 0755)
+				Expect(err).NotTo(HaveOccurred())
+
+				content := `/docs/ @doc-team`
+				codeownersPath := filepath.Join(githubDir, "CODEOWNERS")
+				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
 				checker, err = permissions.NewChecker(tempDir)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("should deny all users when approvers list is empty", func() {
+			It("should deny all users when no global owners configured", func() {
 				canApprove, err := checker.CanApprove("any-user", "/any/path")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(canApprove).To(BeFalse())
@@ -150,21 +153,21 @@ var _ = Describe("Permission Checker [Unit]", func() {
 
 		Context("when checking multiple users", func() {
 			BeforeEach(func() {
-				// Create root OWNERS file with multiple approvers
-				content := `approvers:
-  - alice
-  - bob
-  - charlie
-`
-				ownersPath := filepath.Join(tempDir, "OWNERS")
-				err := os.WriteFile(ownersPath, []byte(content), 0600)
+				// Create CODEOWNERS file with multiple global owners
+				githubDir := filepath.Join(tempDir, ".github")
+				err := os.MkdirAll(githubDir, 0755)
+				Expect(err).NotTo(HaveOccurred())
+
+				content := `* @alice @bob @charlie`
+				codeownersPath := filepath.Join(githubDir, "CODEOWNERS")
+				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
 				checker, err = permissions.NewChecker(tempDir)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("should allow multiple approvers", func() {
+			It("should allow multiple global owners", func() {
 				canApprove, err := checker.CanApprove("alice", "/path")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(canApprove).To(BeTrue())
@@ -178,7 +181,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 				Expect(canApprove).To(BeTrue())
 			})
 
-			It("should deny non-approvers", func() {
+			It("should deny non-owners", func() {
 				canApprove, err := checker.CanApprove("david", "/path")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(canApprove).To(BeFalse())
@@ -191,13 +194,13 @@ var _ = Describe("Permission Checker [Unit]", func() {
 
 		Context("when handling special characters in usernames", func() {
 			BeforeEach(func() {
-				content := `approvers:
-  - user-with-dash
-  - user_with_underscore
-  - user123
-`
-				ownersPath := filepath.Join(tempDir, "OWNERS")
-				err := os.WriteFile(ownersPath, []byte(content), 0600)
+				githubDir := filepath.Join(tempDir, ".github")
+				err := os.MkdirAll(githubDir, 0755)
+				Expect(err).NotTo(HaveOccurred())
+
+				content := `* @user-with-dash @user_with_underscore @user123`
+				codeownersPath := filepath.Join(githubDir, "CODEOWNERS")
+				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
 				checker, err = permissions.NewChecker(tempDir)
@@ -227,27 +230,28 @@ var _ = Describe("Permission Checker [Unit]", func() {
 	Describe("GetApprovers", func() {
 		var checker *permissions.Checker
 
-		Context("when root OWNERS file exists", func() {
+		Context("when CODEOWNERS file exists", func() {
 			BeforeEach(func() {
-				content := `approvers:
-  - admin1
-  - admin2
-`
-				ownersPath := filepath.Join(tempDir, "OWNERS")
-				err := os.WriteFile(ownersPath, []byte(content), 0600)
+				githubDir := filepath.Join(tempDir, ".github")
+				err := os.MkdirAll(githubDir, 0755)
+				Expect(err).NotTo(HaveOccurred())
+
+				content := `* @admin1 @admin2`
+				codeownersPath := filepath.Join(githubDir, "CODEOWNERS")
+				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
 				checker, err = permissions.NewChecker(tempDir)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("should return list of approvers", func() {
+			It("should return list of global owners", func() {
 				approvers := checker.GetApprovers()
 				Expect(approvers).To(Equal([]string{"admin1", "admin2"}))
 			})
 		})
 
-		Context("when root OWNERS file does not exist", func() {
+		Context("when CODEOWNERS file does not exist", func() {
 			BeforeEach(func() {
 				var err error
 				checker, err = permissions.NewChecker(tempDir)
@@ -260,12 +264,15 @@ var _ = Describe("Permission Checker [Unit]", func() {
 			})
 		})
 
-		Context("when root OWNERS file has empty approvers", func() {
+		Context("when CODEOWNERS file has no global owners", func() {
 			BeforeEach(func() {
-				content := `approvers: []
-`
-				ownersPath := filepath.Join(tempDir, "OWNERS")
-				err := os.WriteFile(ownersPath, []byte(content), 0600)
+				githubDir := filepath.Join(tempDir, ".github")
+				err := os.MkdirAll(githubDir, 0755)
+				Expect(err).NotTo(HaveOccurred())
+
+				content := `/docs/ @doc-team`
+				codeownersPath := filepath.Join(githubDir, "CODEOWNERS")
+				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
 				checker, err = permissions.NewChecker(tempDir)

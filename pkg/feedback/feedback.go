@@ -21,7 +21,7 @@ func NewSuccess() *Feedback {
 // The message includes:
 //   - The username that attempted the action
 //   - A list of authorized approvers (if any)
-//   - A suggestion to check the OWNERS file
+//   - A suggestion to check the CODEOWNERS file
 func NewUnauthorized(username string, approvers []string) *Feedback {
 	var message string
 
@@ -29,8 +29,8 @@ func NewUnauthorized(username string, approvers []string) *Feedback {
 		message = fmt.Sprintf(
 			"❌ **Not Authorized**\n\n"+
 				"User `%s` is not authorized to perform this action.\n\n"+
-				"No approvers are configured in the OWNERS file. "+
-				"Please add approvers to the OWNERS file in the repository root.",
+				"No approvers are configured in the CODEOWNERS file. "+
+				"Please add approvers to `.github/CODEOWNERS` in the repository root.",
 			username,
 		)
 	} else {
@@ -139,11 +139,14 @@ func NewMergeConflict() *Feedback {
 	}
 }
 
-// NewNoOWNERSFile creates error feedback for a missing OWNERS file
-func NewNoOWNERSFile() *Feedback {
-	message := "❌ **No OWNERS File**\n\n" +
-		"The OWNERS file was not found in the repository root.\n\n" +
-		"Please create an OWNERS file with a list of approvers."
+// NewNoCodeownersFile creates error feedback for a missing CODEOWNERS file
+func NewNoCodeownersFile() *Feedback {
+	message := "❌ **No CODEOWNERS File**\n\n" +
+		"The CODEOWNERS file was not found at `.github/CODEOWNERS`.\n\n" +
+		"Please create a CODEOWNERS file with global owners:\n" +
+		"```\n" +
+		"* @username1 @username2\n" +
+		"```"
 
 	return &Feedback{
 		Type:    Error,
