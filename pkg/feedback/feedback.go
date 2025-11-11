@@ -152,6 +152,93 @@ func NewNoOWNERSFile() *Feedback {
 	}
 }
 
+// NewApprovalSuccess creates success feedback for a successful PR approval
+//
+// The message acknowledges the approver and indicates the approval was successful
+func NewApprovalSuccess(approver string) *Feedback {
+	message := fmt.Sprintf(
+		"✅ **PR Approved**\n\n"+
+			"This pull request has been approved by `%s`.",
+		approver,
+	)
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "✅",
+		Message: message,
+	}
+}
+
+// NewApprovalFailed creates error feedback for a failed PR approval
+//
+// The reason parameter should describe why the approval failed
+func NewApprovalFailed(reason string) *Feedback {
+	message := fmt.Sprintf(
+		"❌ **Approval Failed**\n\n"+
+			"Failed to approve this pull request.\n\n"+
+			"**Reason:** %s",
+		reason,
+	)
+
+	return &Feedback{
+		Type:    Error,
+		Emoji:   "❌",
+		Message: message,
+	}
+}
+
+// NewMergeSuccess creates success feedback for a successful PR merge
+//
+// The message acknowledges who merged the PR
+func NewMergeSuccess(author string) *Feedback {
+	message := fmt.Sprintf(
+		"✅ **PR Merged**\n\n"+
+			"This pull request has been successfully merged by `%s`.",
+		author,
+	)
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "✅",
+		Message: message,
+	}
+}
+
+// NewMergeFailed creates error feedback for a failed PR merge
+//
+// The reason parameter should describe why the merge failed
+func NewMergeFailed(reason string) *Feedback {
+	message := fmt.Sprintf(
+		"❌ **Merge Failed**\n\n"+
+			"Failed to merge this pull request.\n\n"+
+			"**Reason:** %s",
+		reason,
+	)
+
+	return &Feedback{
+		Type:    Error,
+		Emoji:   "❌",
+		Message: message,
+	}
+}
+
+// NewNotMergeable creates error feedback for a PR that cannot be merged
+func NewNotMergeable() *Feedback {
+	message := "❌ **PR Not Mergeable**\n\n" +
+		"This pull request cannot be merged at this time.\n\n" +
+		"Possible reasons:\n" +
+		"- Merge conflicts exist\n" +
+		"- Required checks have not passed\n" +
+		"- Branch protection rules are not satisfied\n\n" +
+		"Please resolve the issues before attempting to merge."
+
+	return &Feedback{
+		Type:    Error,
+		Emoji:   "❌",
+		Message: message,
+	}
+}
+
 // String returns a string representation of the feedback
 //
 // For success: Returns emoji only

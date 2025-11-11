@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  push:
+    branches: [main, feat/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Install dependencies
+        run: |
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+          go mod download
+
+      - name: Run tests
+        run: ginkgo -r --race --cover
+
+      - name: Run linters
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+          golangci-lint run ./...
+
+      - name: Verify modules
+        run: go mod verify
