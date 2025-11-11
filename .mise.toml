@@ -4,9 +4,10 @@
 # Update mise: mise self-update
 
 [tools]
-go = "1.23.4"                              # Go 1.23.4 (latest stable)
+go = "1.25.4"                              # Go 1.25.4 (latest stable)
 task = "3.42.0"                            # Task runner
 "npm:markdownlint-cli" = "0.45.0"          # Markdown linter
+"go:github.com/onsi/ginkgo/v2/ginkgo" = "latest" # Ginkgo test runner
 
 [env]
 GO111MODULE = "on"
