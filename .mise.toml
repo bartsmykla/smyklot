@@ -1,0 +1,14 @@
+# mise configuration - tool version management
+#
+# Install tools: mise install
+# Update mise: mise self-update
+
+[tools]
+go = "1.23.4"                              # Go 1.23.4 (latest stable)
+task = "3.42.0"                            # Task runner
+"npm:markdownlint-cli" = "0.45.0"          # Markdown linter
+
+[env]
+GO111MODULE = "on"
+GOFLAGS = "-mod=readonly"
+CGO_ENABLED = "0"

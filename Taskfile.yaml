@@ -1,0 +1,274 @@
+# Taskfile - smyklot automation
+#
+# Modern task runner for build, test, and lint automation.
+# Uses Task (https://taskfile.dev/) - a modern Make alternative.
+#
+# Quick Start:
+#   task         - Show available tasks
+#   task test    - Run all tests
+#   task lint    - Run all linters
+#
+# Requirements:
+#   - Go 1.23+
+#   - mise for tool management
+
+version: '3'
+
+set: [pipefail]
+
+output: prefixed
+
+silent: true
+
+vars:
+  GO_FILES:
+    sh: find . -name "*.go" -not -path "./vendor/*" -type f
+  GO_PACKAGES:
+    sh: go list ./...
+  COVERAGE_DIR: coverage
+
+tasks:
+  # ==========================================================================
+  # Default & Help
+  # ==========================================================================
+
+  default:
+    desc: Show available tasks
+    aliases: [ls, list]
+    cmds:
+      - task --list
+
+  # ==========================================================================
+  # Testing
+  # ==========================================================================
+
+  test:
+    desc: Run all tests
+    summary: |
+      Run comprehensive test suite:
+      - Unit tests
+      - Integration tests
+      - Coverage report (80% minimum)
+    cmds:
+      - echo "▶ Running tests"
+      - mkdir -p {{.COVERAGE_DIR}}
+      - ginkgo -r --cover --race --coverprofile={{.COVERAGE_DIR}}/coverage.out
+      - go tool cover -html={{.COVERAGE_DIR}}/coverage.out -o {{.COVERAGE_DIR}}/coverage.html
+      - echo "✓ Tests passed - Coverage report: {{.COVERAGE_DIR}}/coverage.html"
+
+  test:unit:
+    desc: Run unit tests only
+    cmds:
+      - echo "▶ Running unit tests"
+      - ginkgo -r --focus "Unit" --cover --race
+
+  test:integration:
+    desc: Run integration tests only
+    cmds:
+      - echo "▶ Running integration tests"
+      - ginkgo -r --focus "Integration" --cover --race
+
+  test:watch:
+    desc: Run tests in watch mode
+    cmds:
+      - ginkgo watch -r
+
+  # ==========================================================================
+  # Linting
+  # ==========================================================================
+
+  lint:
+    desc: Run all linters
+    summary: |
+      Run code quality checks:
+      - golangci-lint (Go code)
+      - markdownlint (documentation)
+      - go mod verify (dependencies)
+    deps:
+      - lint:go
+      - lint:markdown
+      - lint:mod
+    cmds:
+      - echo "✅ All linters passed!"
+
+  lint:go:
+    desc: Lint Go code
+    cmds:
+      - echo "▶ Linting Go code"
+      - golangci-lint run ./...
+      - echo "✓ Go code passes linting"
+
+  lint:markdown:
+    desc: Lint Markdown files
+    cmds:
+      - echo "▶ Linting Markdown files"
+      - markdownlint '**/*.md' --ignore node_modules --ignore vendor
+      - echo "✓ Markdown files pass linting"
+
+  lint:mod:
+    desc: Verify Go module dependencies
+    cmds:
+      - echo "▶ Verifying Go modules"
+      - go mod verify
+      - echo "✓ Go modules verified"
+
+  # ==========================================================================
+  # Security
+  # ==========================================================================
+
+  security:
+    desc: Run security checks
+    summary: |
+      Run security analysis:
+      - gosec (code security scanner)
+      - go mod verify (supply chain)
+      - nancy (dependency vulnerabilities)
+    cmds:
+      - echo "▶ Running security checks"
+      - gosec -quiet ./...
+      - go list -json -m all | nancy sleuth
+      - echo "✓ Security checks passed"
+
+  security:gosec:
+    desc: Run gosec security scanner
+    cmds:
+      - gosec ./...
+
+  # ==========================================================================
+  # Building
+  # ==========================================================================
+
+  build:
+    desc: Build all binaries
+    deps:
+      - build:github-action
+    cmds:
+      - echo "✓ All binaries built"
+
+  build:github-action:
+    desc: Build GitHub Actions entrypoint
+    sources:
+      - cmd/github-action/**/*.go
+      - pkg/**/*.go
+    generates:
+      - bin/smyklot-github-action
+    cmds:
+      - echo "▶ Building github-action binary"
+      - go build -o bin/smyklot-github-action ./cmd/github-action
+      - echo "✓ Built bin/smyklot-github-action"
+
+  # ==========================================================================
+  # Dependencies
+  # ==========================================================================
+
+  deps:
+    desc: Download and verify dependencies
+    cmds:
+      - echo "▶ Downloading dependencies"
+      - go mod download
+      - go mod verify
+      - echo "✓ Dependencies ready"
+
+  deps:update:
+    desc: Update dependencies
+    cmds:
+      - echo "▶ Updating dependencies"
+      - go get -u ./...
+      - go mod tidy
+      - echo "✓ Dependencies updated"
+
+  deps:tidy:
+    desc: Clean up go.mod and go.sum
+    cmds:
+      - go mod tidy
+
+  # ==========================================================================
+  # Code Generation
+  # ==========================================================================
+
+  generate:
+    desc: Run go generate
+    cmds:
+      - go generate ./...
+
+  # ==========================================================================
+  # Cleanup
+  # ==========================================================================
+
+  clean:
+    desc: Remove build artifacts and caches
+    cmds:
+      - echo "▶ Cleaning build artifacts"
+      - rm -rf bin/ {{.COVERAGE_DIR}}/ dist/
+      - go clean -cache -testcache -modcache
+      - echo "✓ Cleaned"
+
+  # ==========================================================================
+  # Development
+  # ==========================================================================
+
+  dev:setup:
+    desc: Set up development environment
+    cmds:
+      - echo "▶ Setting up development environment"
+      - mise install
+      - task: deps
+      - task: test:setup
+      - echo "✓ Development environment ready"
+
+  test:setup:
+    desc: Set up test framework
+    cmds:
+      - echo "▶ Installing test dependencies"
+      - go install github.com/onsi/ginkgo/v2/ginkgo@latest
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - go install github.com/sonatype-nexus-community/nancy@latest
+      - echo "✓ Test dependencies installed"
+
+  # ==========================================================================
+  # Formatting
+  # ==========================================================================
+
+  fmt:
+    desc: Format code
+    cmds:
+      - echo "▶ Formatting Go code"
+      - go fmt ./...
+      - gofmt -s -w {{.GO_FILES}}
+      - echo "✓ Code formatted"
+
+  # ==========================================================================
+  # CI/CD Helpers
+  # ==========================================================================
+
+  ci:
+    desc: Run CI checks (lint + test + security)
+    cmds:
+      - task: lint
+      - task: security
+      - task: test
+
+  # ==========================================================================
+  # Docker
+  # ==========================================================================
+
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - echo "▶ Building Docker image"
+      - docker build -t smyklot:latest .
+      - echo "✓ Docker image built"
+
+  # ==========================================================================
+  # Information
+  # ==========================================================================
+
+  info:
+    desc: Show project information
+    cmds:
+      - echo "Project: smyklot"
+      - echo "Module: $(go list -m)"
+      - echo "Go version: $(go version)"
+      - echo "Packages: $(go list ./... | wc -l)"
+      - echo "Files: $(find . -name '*.go' -not -path './vendor/*' | wc -l)"
