@@ -20,7 +20,6 @@ import (
 //   - Support path-specific ownership patterns
 //   - Users can approve changes in their scope
 type Checker struct {
-	repoPath      string
 	rootApprovers []string
 }
 
@@ -43,7 +42,6 @@ func NewChecker(repoPath string) (*Checker, error) {
 	}
 
 	checker := &Checker{
-		repoPath:      repoPath,
 		rootApprovers: []string{},
 	}
 

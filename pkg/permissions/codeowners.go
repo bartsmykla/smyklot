@@ -46,10 +46,8 @@ func ParseCodeownersFile(filePath string) (*CodeownersFile, error) {
 	}
 
 	scanner := bufio.NewScanner(file)
-	lineNum := 0
 
 	for scanner.Scan() {
-		lineNum++
 		line := strings.TrimSpace(scanner.Text())
 
 		// Skip empty lines and comments

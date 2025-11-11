@@ -92,6 +92,10 @@ linters:
       excludes:
         - G104  # Audit errors not checked (handled by errcheck)
 
+    unused:
+      exported-is-used: false
+      exported-fields-are-used: false
+
   exclusions:
     generated: strict
     rules:
@@ -105,6 +109,7 @@ linters:
           - funlen
           - goconst
           - unparam
+          - unused
           - revive  # Allow dot imports and unused parameters in tests
 
       # Allow long functions in main.go (GitHub Actions handlers)

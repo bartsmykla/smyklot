@@ -326,7 +326,7 @@ func handleApprove(client *github.Client, prNum, commentID int) error {
 		)
 	}
 
-	// Post success feedback
+	// Post-success feedback
 	fb := feedback.NewApprovalSuccess(config.CommentAuthor)
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
@@ -369,7 +369,7 @@ func handleMerge(client *github.Client, prNum, commentID int) error {
 		)
 	}
 
-	// Post success feedback
+	// Post-success feedback
 	fb := feedback.NewMergeSuccess(config.CommentAuthor)
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
