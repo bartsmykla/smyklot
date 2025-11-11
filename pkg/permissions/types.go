@@ -6,7 +6,7 @@ type OwnersFile struct {
 	Approvers []string `yaml:"approvers"`
 
 	// Path is the directory path this OWNERS file applies to
-	// Empty string means root OWNERS file
+	// An empty string indicates the root OWNERS file
 	Path string `yaml:"-"`
 }
 
@@ -16,9 +16,9 @@ type PermissionScope struct {
 	Username string
 
 	// Paths is a list of paths the user can approve
-	// Empty list means root-level approval (all paths)
+	// An empty list indicates root-level approval (all paths)
 	Paths []string
 
-	// IsRootApprover indicates if user is a root approver
+	// IsRootApprover indicates whether the user is a root approver
 	IsRootApprover bool
 }

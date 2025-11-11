@@ -5,21 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
-var (
-	// ErrEmptyFilePath is returned when an empty file path is provided
-	ErrEmptyFilePath = errors.New("empty file path")
-
-	// ErrInvalidYAML is returned when the OWNERS file contains invalid YAML
-	ErrInvalidYAML = errors.New("invalid YAML syntax in OWNERS file")
-)
-
-// ParseOwnersFile reads and parses an OWNERS file from the given path
+// ParseOwnersFile reads and parses an OWNERS file from the given path.
 //
-// The function:
+// The function performs the following operations:
 //   - Reads the OWNERS file from disk
 //   - Parses the YAML content
 //   - Extracts the approvers list
@@ -38,13 +29,13 @@ func ParseOwnersFile(filePath string) (*OwnersFile, error) {
 	// Read the file
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read OWNERS file")
+		return nil, NewParseError(ErrReadFailed, filePath, err)
 	}
 
 	// Parse YAML
 	var owners OwnersFile
 	if err := yaml.Unmarshal(data, &owners); err != nil {
-		return nil, errors.Wrap(ErrInvalidYAML, err.Error())
+		return nil, NewParseError(ErrInvalidYAML, filePath, err)
 	}
 
 	// Set the path to the directory containing the OWNERS file
@@ -56,7 +47,8 @@ func ParseOwnersFile(filePath string) (*OwnersFile, error) {
 	return &owners, nil
 }
 
-// filterEmptyApprovers removes empty strings and whitespace-only strings from the approvers list
+// filterEmptyApprovers removes empty strings and whitespace-only strings
+// from the approvers list.
 func filterEmptyApprovers(approvers []string) []string {
 	if len(approvers) == 0 {
 		return approvers

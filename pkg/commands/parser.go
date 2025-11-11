@@ -12,14 +12,14 @@ var (
 	// mentionCommandRegex matches @smyklot command patterns
 	mentionCommandRegex = regexp.MustCompile(`(?i)@smyklot\s+(\w+)`)
 
-	// validCommands maps command names to their types
+	// validCommands maps command names to their corresponding types
 	validCommands = map[string]CommandType{
 		"approve": CommandApprove,
 		"merge":   CommandMerge,
 	}
 )
 
-// ParseCommand parses a comment text and extracts a command if present
+// ParseCommand parses comment text and extracts a command if present.
 //
 // Supported formats:
 //   - /approve or /merge (slash commands)
@@ -39,7 +39,7 @@ func ParseCommand(commentBody string) (Command, error) {
 		return cmd, nil
 	}
 
-	// Try to match slash command first (priority)
+	// Try to match a slash command first (higher priority)
 	if matches := slashCommandRegex.FindStringSubmatch(commentBody); len(matches) > 1 {
 		commandName := strings.ToLower(matches[1])
 		if cmdType, ok := validCommands[commandName]; ok {
@@ -47,11 +47,11 @@ func ParseCommand(commentBody string) (Command, error) {
 			cmd.IsValid = true
 			return cmd, nil
 		}
-		// Invalid slash command - return unknown
+		// Invalid slash command found - return unknown
 		return cmd, nil
 	}
 
-	// Try to match mention command
+	// Try to match a mention command
 	if matches := mentionCommandRegex.FindStringSubmatch(commentBody); len(matches) > 1 {
 		commandName := strings.ToLower(matches[1])
 		if cmdType, ok := validCommands[commandName]; ok {
@@ -59,7 +59,7 @@ func ParseCommand(commentBody string) (Command, error) {
 			cmd.IsValid = true
 			return cmd, nil
 		}
-		// Invalid mention command - return unknown
+		// Invalid mention command found - return unknown
 		return cmd, nil
 	}
 

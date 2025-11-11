@@ -35,13 +35,13 @@ var _ = Describe("Permission Checker [Unit]", func() {
 		It("should return error for empty repo path", func() {
 			_, err := permissions.NewChecker("")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("empty repo path"))
+			Expect(err.Error()).To(MatchRegexp(`(?i)empty.*repository.*path`))
 		})
 
 		It("should return error for non-existent repo path", func() {
 			_, err := permissions.NewChecker("/nonexistent/path")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("repo path does not exist"))
+			Expect(err.Error()).To(MatchRegexp(`(?i)repository.*path.*does not exist`))
 		})
 	})
 

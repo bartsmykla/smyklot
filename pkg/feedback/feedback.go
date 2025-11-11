@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// NewSuccess creates a success feedback
+// NewSuccess creates success feedback
 //
-// Success feedback only uses emoji reaction (✅), no comment is posted.
+// Success feedback uses only an emoji reaction (✅); no comment is posted
 func NewSuccess() *Feedback {
 	return &Feedback{
 		Type:    Success,
@@ -16,12 +16,12 @@ func NewSuccess() *Feedback {
 	}
 }
 
-// NewUnauthorized creates an error feedback for unauthorized user
+// NewUnauthorized creates error feedback for an unauthorized user
 //
 // The message includes:
 //   - The username that attempted the action
-//   - List of authorized approvers (if any)
-//   - Suggestion to check OWNERS file
+//   - A list of authorized approvers (if any)
+//   - A suggestion to check the OWNERS file
 func NewUnauthorized(username string, approvers []string) *Feedback {
 	var message string
 
@@ -29,7 +29,7 @@ func NewUnauthorized(username string, approvers []string) *Feedback {
 		message = fmt.Sprintf(
 			"❌ **Not Authorized**\n\n"+
 				"User `%s` is not authorized to perform this action.\n\n"+
-				"There are no approvers configured in the OWNERS file. "+
+				"No approvers are configured in the OWNERS file. "+
 				"Please add approvers to the OWNERS file in the repository root.",
 			username,
 		)
@@ -52,11 +52,11 @@ func NewUnauthorized(username string, approvers []string) *Feedback {
 	}
 }
 
-// NewInvalidCommand creates an error feedback for invalid command
+// NewInvalidCommand creates error feedback for an invalid command
 //
 // The message includes:
 //   - The invalid command that was used
-//   - List of valid commands
+//   - A list of valid commands
 func NewInvalidCommand(command string) *Feedback {
 	message := fmt.Sprintf(
 		"❌ **Invalid Command**\n\n"+
@@ -64,7 +64,7 @@ func NewInvalidCommand(command string) *Feedback {
 			"**Valid commands:**\n"+
 			"- `/approve` or `@smyklot approve` - Approve the PR\n"+
 			"- `/merge` or `@smyklot merge` - Merge the PR\n\n"+
-			"Please use one of the valid commands above.",
+			"Please use one of the valid commands listed above.",
 		command,
 	)
 
@@ -75,13 +75,13 @@ func NewInvalidCommand(command string) *Feedback {
 	}
 }
 
-// NewAlreadyApproved creates a warning feedback for already approved PR
+// NewAlreadyApproved creates warning feedback for an already-approved PR
 //
 // The message indicates who already approved the PR
 func NewAlreadyApproved(approver string) *Feedback {
 	message := fmt.Sprintf(
 		"⚠️ **Already Approved**\n\n"+
-			"This PR has already been approved by `%s`.\n\n"+
+			"This pull request has already been approved by `%s`.\n\n"+
 			"No action taken.",
 		approver,
 	)
@@ -93,7 +93,7 @@ func NewAlreadyApproved(approver string) *Feedback {
 	}
 }
 
-// NewAlreadyMerged creates a warning feedback for already merged PR
+// NewAlreadyMerged creates warning feedback for an already-merged PR
 func NewAlreadyMerged() *Feedback {
 	message := "⚠️ **Already Merged**\n\n" +
 		"This pull request has already been merged.\n\n" +
@@ -106,7 +106,7 @@ func NewAlreadyMerged() *Feedback {
 	}
 }
 
-// NewPRNotReady creates an error feedback for PR not ready to merge
+// NewPRNotReady creates error feedback for a PR that is not ready to merge
 //
 // The reason parameter should describe why the PR is not ready
 // (e.g., "CI checks failing", "required reviews not met")
@@ -126,7 +126,7 @@ func NewPRNotReady(reason string) *Feedback {
 	}
 }
 
-// NewMergeConflict creates an error feedback for merge conflict
+// NewMergeConflict creates error feedback for a merge conflict
 func NewMergeConflict() *Feedback {
 	message := "❌ **Merge Conflict**\n\n" +
 		"This pull request has conflicts with the base branch.\n\n" +
@@ -139,11 +139,11 @@ func NewMergeConflict() *Feedback {
 	}
 }
 
-// NewNoOWNERSFile creates an error feedback for missing OWNERS file
+// NewNoOWNERSFile creates error feedback for a missing OWNERS file
 func NewNoOWNERSFile() *Feedback {
 	message := "❌ **No OWNERS File**\n\n" +
 		"The OWNERS file was not found in the repository root.\n\n" +
-		"Please create an OWNERS file with the list of approvers."
+		"Please create an OWNERS file with a list of approvers."
 
 	return &Feedback{
 		Type:    Error,

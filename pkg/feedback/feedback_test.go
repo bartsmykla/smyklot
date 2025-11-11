@@ -51,7 +51,7 @@ var _ = Describe("Feedback System [Unit]", func() {
 		It("should handle empty approvers list", func() {
 			fb := feedback.NewUnauthorized("john", []string{})
 			Expect(fb.Type).To(Equal(feedback.Error))
-			Expect(fb.Message).To(ContainSubstring("no approvers"))
+			Expect(fb.Message).To(MatchRegexp(`(?i)no approvers`))
 		})
 
 		It("should handle multiple approvers", func() {

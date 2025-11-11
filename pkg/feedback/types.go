@@ -22,10 +22,10 @@ const (
 // Success feedback: Emoji reaction only
 // Error/Warning feedback: Emoji reaction + comment with details
 type Feedback struct {
-	// Type is the feedback type (success, error, warning)
+	// Type is the feedback type (success, error, or warning)
 	Type FeedbackType
 
-	// Emoji is the emoji to use for the reaction
+	// Emoji is the emoji used for the reaction
 	Emoji string
 
 	// Message is the optional comment message
