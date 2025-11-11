@@ -1,0 +1,153 @@
+version: "2"
+
+linters:
+  enable:
+    # Core
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Security
+    - gosec
+
+    # Quality
+    - gocyclo
+    - gocognit
+    - funlen
+    - goconst
+    - dupl
+
+    # Best Practices
+    - gocritic
+    - revive
+    - misspell
+    - whitespace
+
+linters-settings:
+  cyclop:
+    max-complexity: 30
+
+  funlen:
+    lines: 100
+    statements: 50
+
+  gocognit:
+    min-complexity: 20
+
+  gocyclo:
+    min-complexity: 30
+
+  goconst:
+    min-len: 2
+    min-occurrences: 3
+
+  dupl:
+    threshold: 100
+
+  revive:
+    enable-all-rules: false
+    rules:
+      # Critical rules
+      - name: blank-imports
+      - name: context-keys-type
+      - name: time-equal
+      - name: time-naming
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: if-return
+      - name: increment-decrement
+      - name: var-declaration
+
+      # Disabled (too noisy or stylistic)
+      - name: package-comments
+        disabled: true
+      - name: dot-imports
+        disabled: true  # Ginkgo uses dot imports for BDD
+      - name: exported
+        disabled: true
+      - name: var-naming
+        disabled: true
+      - name: indent-error-flow
+        disabled: true
+      - name: context-as-argument
+        disabled: true
+
+  gocritic:
+    disabled-checks:
+      - ifElseChain
+      - commentFormatting
+      - badCall
+      - hugeParam  # Disabled for test helpers with large structs
+
+  godot:
+    scope: declarations
+    exclude:
+      - "^@"
+      - "^TODO"
+      - "^FIXME"
+      - "^BUG"
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+    exclude-functions:
+      - (*os.File).Close
+      - (io.Closer).Close
+
+  staticcheck:
+    checks: ["all"]
+
+  gosec:
+    excludes:
+      - G104  # Audit errors not checked (handled by errcheck)
+      - G304  # File path from variable (handled by permissions package)
+
+issues:
+  max-same-issues: 50
+
+  exclude-rules:
+    # Exclude some linters from test files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - funlen
+        - goconst
+        - unparam
+
+    # Allow dot imports for Ginkgo/Gomega in tests
+    - path: _test\.go
+      text: "dot imports"
+      linters:
+        - revive
+        - stylecheck
+
+    # Allow long functions in main.go (GitHub Actions handlers)
+    - path: cmd/github-action/main\.go
+      linters:
+        - funlen
+        - gocyclo
+        - cyclop
+        - gocognit
+
+    # Exclude error shadowing in test setup
+    - path: _test\.go
+      text: "shadow: declaration of \"err\""
+      linters:
+        - govet
+
+run:
+  timeout: 5m
+  tests: true
+  build-tags:
+    - integration
+  skip-dirs:
+    - vendor
+    - tmp
+    - bin
+    - .git

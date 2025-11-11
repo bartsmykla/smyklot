@@ -4,20 +4,32 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/bartsmykla/smyklot/pkg/commands"
 	"github.com/bartsmykla/smyklot/pkg/feedback"
 	"github.com/bartsmykla/smyklot/pkg/github"
 	"github.com/bartsmykla/smyklot/pkg/permissions"
 )
 
+var rootCmd = &cobra.Command{
+	Use:   "smyklot-github-action",
+	Short: "GitHub Actions bot for automated PR approvals and merges",
+	Long: `Smyklot is a GitHub Actions bot that enables automated PR approvals
+and merges based on CODEOWNERS permissions.
+
+It reads environment variables from GitHub Actions and executes
+commands like /approve and /merge based on user permissions.`,
+	RunE: run,
+}
+
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(cmd *cobra.Command, args []string) error {
 	// Read environment variables from GitHub Actions
 	token := os.Getenv("GITHUB_TOKEN")
 	commentBody := os.Getenv("COMMENT_BODY")
@@ -51,7 +63,7 @@ func run() error {
 	}
 
 	// Parse the command from the comment
-	cmd, err := commands.ParseCommand(commentBody)
+	parsedCmd, err := commands.ParseCommand(commentBody)
 	if err != nil {
 		// Not a valid command, ignore
 		return nil
@@ -103,7 +115,7 @@ func run() error {
 	}
 
 	// Execute the command based on type
-	switch cmd.Type {
+	switch parsedCmd.Type {
 	case commands.CommandApprove:
 		if err := handleApprove(client, repoOwner, repoName, prNum, commentIDNum, commentAuthor); err != nil {
 			return err
