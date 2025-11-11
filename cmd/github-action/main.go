@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	envGitHubToken    = "GITHUB_TOKEN"         //nolint:gosec // Environment variable name, not a credential
+	envGitHubToken    = "GITHUB_TOKEN" //nolint:gosec // Environment variable name, not a credential
 	envCommentBody    = "COMMENT_BODY"
 	envCommentID      = "COMMENT_ID"
 	envPRNumber       = "PR_NUMBER"
@@ -35,7 +35,7 @@ const (
 	flagRepoOwner     = "repo-owner"
 	flagRepoName      = "repo-name"
 	flagCommentAuthor = "comment-author"
-	descToken         = "GitHub API token"     //nolint:gosec // Flag description, not a credential
+	descToken         = "GitHub API token" //nolint:gosec // Flag description, not a credential
 	descCommentBody   = "PR comment body"
 	descCommentID     = "PR comment ID"
 	descPRNumber      = "Pull request number"
@@ -73,12 +73,16 @@ commands like /approve and /merge based on user permissions.`,
 func init() {
 	// Define CLI flags that can override environment variables
 	rootCmd.Flags().StringVar(&config.Token, flagToken, "", descToken)
-	rootCmd.Flags().StringVar(&config.CommentBody, flagCommentBody, "", descCommentBody)
+	rootCmd.Flags().StringVar(
+		&config.CommentBody, flagCommentBody, "", descCommentBody,
+	)
 	rootCmd.Flags().StringVar(&config.CommentID, flagCommentID, "", descCommentID)
 	rootCmd.Flags().StringVar(&config.PRNumber, flagPRNumber, "", descPRNumber)
 	rootCmd.Flags().StringVar(&config.RepoOwner, flagRepoOwner, "", descRepoOwner)
 	rootCmd.Flags().StringVar(&config.RepoName, flagRepoName, "", descRepoName)
-	rootCmd.Flags().StringVar(&config.CommentAuthor, flagCommentAuthor, "", descCommentAuthor)
+	rootCmd.Flags().StringVar(
+		&config.CommentAuthor, flagCommentAuthor, "", descCommentAuthor,
+	)
 }
 
 func main() {
@@ -105,13 +109,13 @@ func run(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	// Create GitHub client
+	// Create a GitHub client
 	client, err := github.NewClient(config.Token, emptyBaseURL)
 	if err != nil {
 		return NewGitHubError(ErrGitHubClient, err)
 	}
 
-	// Get current working directory (repository root)
+	// Get the current working directory (repository root)
 	repoPath, err := os.Getwd()
 	if err != nil {
 		return NewGitHubError(ErrGetWorkingDirectory, err)
@@ -223,6 +227,75 @@ func validateConfig() error {
 	return nil
 }
 
+// postFeedback posts a comment and adds a reaction to a PR.
+func postFeedback(
+	client *github.Client,
+	prNum, commentID int,
+	message string,
+	reaction github.ReactionType,
+) error {
+	if err := client.PostComment(
+		config.RepoOwner,
+		config.RepoName,
+		prNum,
+		message,
+	); err != nil {
+		return NewGitHubError(ErrPostComment, err)
+	}
+
+	if err := client.AddReaction(
+		config.RepoOwner,
+		config.RepoName,
+		commentID,
+		reaction,
+	); err != nil {
+		return NewGitHubError(ErrAddReaction, err)
+	}
+
+	return nil
+}
+
+// addReaction adds a reaction to a comment.
+func addReaction(
+	client *github.Client,
+	commentID int,
+	reaction github.ReactionType,
+) error {
+	if err := client.AddReaction(
+		config.RepoOwner,
+		config.RepoName,
+		commentID,
+		reaction,
+	); err != nil {
+		return NewGitHubError(ErrAddReaction, err)
+	}
+
+	return nil
+}
+
+// postOperationFailure posts failure feedback for a failed operation.
+func postOperationFailure(
+	client *github.Client,
+	prNum, commentID int,
+	operationErr error,
+	feedbackFunc func(string) *feedback.Feedback,
+	sentinelErr error,
+) error {
+	fb := feedbackFunc(operationErr.Error())
+
+	if err := postFeedback(
+		client,
+		prNum,
+		commentID,
+		fb.Message,
+		github.ReactionError,
+	); err != nil {
+		return err
+	}
+
+	return NewGitHubError(sentinelErr, operationErr)
+}
+
 // handleUnauthorized posts feedback for unauthorized users.
 func handleUnauthorized(
 	client *github.Client,
@@ -231,69 +304,52 @@ func handleUnauthorized(
 ) error {
 	fb := feedback.NewUnauthorized(config.CommentAuthor, checker.GetApprovers())
 
-	if err := client.PostComment(config.RepoOwner, config.RepoName, prNum, fb.Message); err != nil {
-		return NewGitHubError(ErrPostComment, err)
-	}
-
-	if err := client.AddReaction(config.RepoOwner, config.RepoName, commentID, github.ReactionError); err != nil {
-		return NewGitHubError(ErrAddReaction, err)
-	}
-
-	return nil
+	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
 }
 
 // handleApprove handles the /approve command.
 func handleApprove(client *github.Client, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
-	if err := client.AddReaction(config.RepoOwner, config.RepoName, commentID, github.ReactionEyes); err != nil {
-		return NewGitHubError(ErrAddReaction, err)
+	if err := addReaction(client, commentID, github.ReactionEyes); err != nil {
+		return err
 	}
 
 	// Approve the PR
 	if err := client.ApprovePR(config.RepoOwner, config.RepoName, prNum); err != nil {
-		return postApprovalFailure(client, prNum, commentID, err)
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewApprovalFailed,
+			ErrApprovePR,
+		)
 	}
 
 	// Post success feedback
 	fb := feedback.NewApprovalSuccess(config.CommentAuthor)
-	if err := client.PostComment(config.RepoOwner, config.RepoName, prNum, fb.Message); err != nil {
-		return NewGitHubError(ErrPostComment, err)
-	}
 
-	// Add success reaction
-	if err := client.AddReaction(config.RepoOwner, config.RepoName, commentID, github.ReactionSuccess); err != nil {
-		return NewGitHubError(ErrAddReaction, err)
-	}
-
-	return nil
-}
-
-// postApprovalFailure posts failure feedback for failed approval.
-func postApprovalFailure(client *github.Client, prNum, commentID int, approvalErr error) error {
-	fb := feedback.NewApprovalFailed(approvalErr.Error())
-
-	if err := client.PostComment(config.RepoOwner, config.RepoName, prNum, fb.Message); err != nil {
-		return NewGitHubError(ErrPostComment, err)
-	}
-
-	if err := client.AddReaction(config.RepoOwner, config.RepoName, commentID, github.ReactionError); err != nil {
-		return NewGitHubError(ErrAddReaction, err)
-	}
-
-	return NewGitHubError(ErrApprovePR, approvalErr)
+	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
 // handleMerge handles the /merge command.
 func handleMerge(client *github.Client, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
-	if err := client.AddReaction(config.RepoOwner, config.RepoName, commentID, github.ReactionEyes); err != nil {
-		return NewGitHubError(ErrAddReaction, err)
+	if err := addReaction(client, commentID, github.ReactionEyes); err != nil {
+		return err
 	}
 
 	// Get PR info to check if it's mergeable
 	info, err := client.GetPRInfo(config.RepoOwner, config.RepoName, prNum)
 	if err != nil {
-		return postMergeFailure(client, prNum, commentID, err)
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewMergeFailed,
+			ErrMergePR,
+		)
 	}
 
 	// Check if PR is mergeable
@@ -303,49 +359,25 @@ func handleMerge(client *github.Client, prNum, commentID int) error {
 
 	// Merge the PR
 	if err := client.MergePR(config.RepoOwner, config.RepoName, prNum); err != nil {
-		return postMergeFailure(client, prNum, commentID, err)
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewMergeFailed,
+			ErrMergePR,
+		)
 	}
 
 	// Post success feedback
 	fb := feedback.NewMergeSuccess(config.CommentAuthor)
-	if err := client.PostComment(config.RepoOwner, config.RepoName, prNum, fb.Message); err != nil {
-		return NewGitHubError(ErrPostComment, err)
-	}
 
-	// Add success reaction
-	if err := client.AddReaction(config.RepoOwner, config.RepoName, commentID, github.ReactionSuccess); err != nil {
-		return NewGitHubError(ErrAddReaction, err)
-	}
-
-	return nil
-}
-
-// postMergeFailure posts failure feedback for a failed merge.
-func postMergeFailure(client *github.Client, prNum, commentID int, mergeErr error) error {
-	fb := feedback.NewMergeFailed(mergeErr.Error())
-
-	if err := client.PostComment(config.RepoOwner, config.RepoName, prNum, fb.Message); err != nil {
-		return NewGitHubError(ErrPostComment, err)
-	}
-
-	if err := client.AddReaction(config.RepoOwner, config.RepoName, commentID, github.ReactionError); err != nil {
-		return NewGitHubError(ErrAddReaction, err)
-	}
-
-	return NewGitHubError(ErrMergePR, mergeErr)
+	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
 // postNotMergeable posts feedback when PR is not mergeable.
 func postNotMergeable(client *github.Client, prNum, commentID int) error {
 	fb := feedback.NewNotMergeable()
 
-	if err := client.PostComment(config.RepoOwner, config.RepoName, prNum, fb.Message); err != nil {
-		return NewGitHubError(ErrPostComment, err)
-	}
-
-	if err := client.AddReaction(config.RepoOwner, config.RepoName, commentID, github.ReactionWarning); err != nil {
-		return NewGitHubError(ErrAddReaction, err)
-	}
-
-	return nil
+	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionWarning)
 }
