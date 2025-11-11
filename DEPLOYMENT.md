@@ -26,7 +26,18 @@ Path-specific patterns will be supported in Phase 2.
 
 Create `.github/workflows/pr-commands.yml`:
 
-**Option A: Using GITHUB_TOKEN (simpler, comments from workflow user)**
+Smyklot supports two ways to pass parameters:
+
+- **Inputs** (recommended): Cleaner syntax using action inputs
+- **Environment variables**: Alternative approach, useful for
+  compatibility
+
+Both approaches support automatic fallback to environment variables when
+inputs are not provided.
+
+#### Option A: Using GITHUB_TOKEN (simpler, comments from workflow user)
+
+Using inputs:
 
 ```yaml
 name: PR Commands
@@ -57,7 +68,22 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Run Smyklot
-        uses: bartsmykla/smyklot@feat/go-rewrite-github-app
+        uses: bartsmykla/smyklot@v0.1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          comment-body: ${{ github.event.comment.body }}
+          comment-id: ${{ github.event.comment.id }}
+          pr-number: ${{ github.event.issue.number }}
+          repo-owner: ${{ github.repository_owner }}
+          repo-name: ${{ github.event.repository.name }}
+          comment-author: ${{ github.event.comment.user.login }}
+```
+
+Using environment variables:
+
+```yaml
+      - name: Run Smyklot
+        uses: bartsmykla/smyklot@v0.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMENT_BODY: ${{ github.event.comment.body }}
@@ -68,7 +94,9 @@ jobs:
           COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
 ```
 
-**Option B: Using GitHub App (recommended, comments from app)**
+#### Option B: Using GitHub App (recommended, comments from app)
+
+Using inputs:
 
 ```yaml
 name: PR Commands
@@ -106,7 +134,22 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Run Smyklot
-        uses: bartsmykla/smyklot@feat/go-rewrite-github-app
+        uses: bartsmykla/smyklot@v0.1.0
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+          comment-body: ${{ github.event.comment.body }}
+          comment-id: ${{ github.event.comment.id }}
+          pr-number: ${{ github.event.issue.number }}
+          repo-owner: ${{ github.repository_owner }}
+          repo-name: ${{ github.event.repository.name }}
+          comment-author: ${{ github.event.comment.user.login }}
+```
+
+Using environment variables:
+
+```yaml
+      - name: Run Smyklot
+        uses: bartsmykla/smyklot@v0.1.0
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
           COMMENT_BODY: ${{ github.event.comment.body }}
