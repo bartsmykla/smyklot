@@ -7,16 +7,35 @@ import (
 
 // Sentinel errors for common failure cases.
 var (
-	ErrMissingEnvVar       = errors.New("required environment variable is missing")
-	ErrInvalidInput        = errors.New("invalid input provided")
-	ErrGitHubClient        = errors.New("GitHub client error")
-	ErrPermissionCheck     = errors.New("permission check failed")
-	ErrPostComment         = errors.New("failed to post comment")
-	ErrAddReaction         = errors.New("failed to add reaction")
-	ErrApprovePR           = errors.New("failed to approve PR")
-	ErrMergePR             = errors.New("failed to merge PR")
+	// ErrMissingEnvVar is returned when a required environment variable is missing
+	ErrMissingEnvVar = errors.New("required environment variable is missing")
+
+	// ErrInvalidInput is returned when invalid input is provided
+	ErrInvalidInput = errors.New("invalid input provided")
+
+	// ErrGitHubClient is returned when GitHub client creation fails
+	ErrGitHubClient = errors.New("GitHub client error")
+
+	// ErrPermissionCheck is returned when the permission check fails
+	ErrPermissionCheck = errors.New("permission check failed")
+
+	// ErrPostComment is returned when posting a comment fails
+	ErrPostComment = errors.New("failed to post comment")
+
+	// ErrAddReaction is returned when adding a reaction fails
+	ErrAddReaction = errors.New("failed to add reaction")
+
+	// ErrApprovePR is returned when approving a PR fails
+	ErrApprovePR = errors.New("failed to approve PR")
+
+	// ErrMergePR is returned when merging a PR fails
+	ErrMergePR = errors.New("failed to merge PR")
+
+	// ErrGetWorkingDirectory is returned when getting working directory fails
 	ErrGetWorkingDirectory = errors.New("failed to get the working directory")
-	ErrInitPermissions     = errors.New("failed to initialize permissions")
+
+	// ErrInitPermissions is returned when initializing permissions fails
+	ErrInitPermissions = errors.New("failed to initialize permissions")
 )
 
 // EnvVarError represents an error related to environment variable validation.

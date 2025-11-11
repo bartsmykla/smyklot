@@ -1,13 +1,12 @@
 package permissions
 
 import (
+	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
-// Sentinel errors
+// Sentinel errors for permission operations.
 var (
 	// ErrEmptyFilePath is returned when an empty file path is provided
 	ErrEmptyFilePath = errors.New("empty file path provided")
@@ -66,10 +65,12 @@ func (e *ParseError) Unwrap() error {
 
 // Is checks if the target error matches
 func (e *ParseError) Is(target error) bool {
-	if e.Op != nil {
-		return errors.Is(e.Op, target)
+	var parseErr *ParseError
+	if errors.As(target, &parseErr) {
+		return true
 	}
-	return false
+
+	return errors.Is(e.Op, target)
 }
 
 // CheckerError represents an error that occurred during permission checking
@@ -116,8 +117,10 @@ func (e *CheckerError) Unwrap() error {
 
 // Is checks if the target error matches
 func (e *CheckerError) Is(target error) bool {
-	if e.Op != nil {
-		return errors.Is(e.Op, target)
+	var checkerErr *CheckerError
+	if errors.As(target, &checkerErr) {
+		return true
 	}
-	return false
+
+	return errors.Is(e.Op, target)
 }

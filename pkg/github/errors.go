@@ -1,12 +1,12 @@
 package github
 
 import (
+	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
+// Sentinel errors for GitHub API operations.
 var (
 	// ErrEmptyToken is returned when an empty token is provided
 	ErrEmptyToken = errors.New("empty GitHub token provided")
@@ -48,20 +48,25 @@ func NewAPIError(op error, statusCode int, method, path string, err error) error
 // Error returns the error message
 func (e *APIError) Error() string {
 	var builder strings.Builder
+
 	if e.Op != nil {
 		builder.WriteString(e.Op.Error())
 	} else {
 		builder.WriteString("API error")
 	}
+
 	if e.StatusCode != 0 {
 		builder.WriteString(fmt.Sprintf(" (status: %d)", e.StatusCode))
 	}
+
 	if e.Method != "" || e.Path != "" {
 		builder.WriteString(fmt.Sprintf(" [%s %s]", e.Method, e.Path))
 	}
+
 	if e.Detail != "" {
 		builder.WriteString(fmt.Sprintf(": %s", e.Detail))
 	}
+
 	return builder.String()
 }
 
@@ -72,6 +77,10 @@ func (e *APIError) Unwrap() error {
 
 // Is checks if the target error matches this error type
 func (e *APIError) Is(target error) bool {
-	_, ok := target.(*APIError)
-	return ok
+	var apiErr *APIError
+	if errors.As(target, &apiErr) {
+		return true
+	}
+
+	return errors.Is(e.Op, target)
 }
