@@ -17,7 +17,7 @@ var (
 	ErrApprovePR           = errors.New("failed to approve PR")
 	ErrMergePR             = errors.New("failed to merge PR")
 	ErrGetPRInfo           = errors.New("failed to get PR info")
-	ErrGetWorkingDirectory = errors.New("failed to get working directory")
+	ErrGetWorkingDirectory = errors.New("failed to get the working directory")
 	ErrInitPermissions     = errors.New("failed to initialize permissions")
 )
 
@@ -43,8 +43,8 @@ func (e *EnvVarError) Unwrap() error {
 }
 
 func (e *EnvVarError) Is(target error) bool {
-	_, ok := target.(*EnvVarError)
-	if ok {
+	var envVarErr *EnvVarError
+	if errors.As(target, &envVarErr) {
 		return true
 	}
 
@@ -79,8 +79,8 @@ func (e *InputError) Unwrap() error {
 }
 
 func (e *InputError) Is(target error) bool {
-	_, ok := target.(*InputError)
-	if ok {
+	var inputErr *InputError
+	if errors.As(target, &inputErr) {
 		return true
 	}
 
@@ -117,8 +117,8 @@ func (e *GitHubError) Unwrap() error {
 }
 
 func (e *GitHubError) Is(target error) bool {
-	_, ok := target.(*GitHubError)
-	if ok {
+	var ghErr *GitHubError
+	if errors.As(target, &ghErr) {
 		return true
 	}
 

@@ -25,6 +25,8 @@ linters:
     - revive
     - misspell
     - whitespace
+    - unparam
+    - unconvert
 
   settings:
     cyclop:
