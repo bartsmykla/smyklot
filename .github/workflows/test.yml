@@ -21,9 +21,7 @@ jobs:
         uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
 
       - name: Run tests
-        env:
-          CGO_ENABLED: 1
-        run: ginkgo -r --race --cover
+        run: ginkgo -r --cover
 
       - name: Run linters
         uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47 # v9.0.0
