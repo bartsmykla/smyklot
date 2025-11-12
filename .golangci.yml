@@ -93,7 +93,6 @@ linters:
         - G104  # Audit errors not checked (handled by errcheck)
 
     unused:
-      exported-is-used: false
       exported-fields-are-used: false
 
   exclusions:
@@ -134,8 +133,4 @@ run:
   tests: true
   build-tags:
     - integration
-  skip-dirs:
-    - vendor
-    - tmp
-    - bin
-    - .git
+  skip-dirs-use-default: true
