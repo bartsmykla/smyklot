@@ -4,12 +4,15 @@
 
 ## Overview
 
-Smyklot is a lightweight GitHub Actions bot that enables team members to approve and merge pull requests through simple commands, with permissions managed through GitHub's native `.github/CODEOWNERS` file.
+Smyklot is a lightweight GitHub Actions bot that enables team members to
+approve and merge pull requests through simple commands, with permissions
+managed through GitHub's native `.github/CODEOWNERS` file.
 
 ## Features
 
 - Command-based PR management via issue comments
 - Permission system using `.github/CODEOWNERS`
+- Flexible configuration (environment variables, CLI flags)
 - Automated feedback with emoji reactions
 - Security-first design following GitHub Actions best practices
 - Zero external dependencies - runs entirely on GitHub Actions
@@ -34,6 +37,8 @@ cp .github/workflows/test.yml your-repo/.github/workflows/
 
 ### Configuration
 
+#### CODEOWNERS Setup
+
 Create `.github/CODEOWNERS` in your repository:
 
 ```text
@@ -41,7 +46,109 @@ Create `.github/CODEOWNERS` in your repository:
 * @username1 @username2
 ```
 
-Currently only global owners (`*` pattern) are supported. Path-specific owners will be added in Phase 2.
+Currently only global owners (`*` pattern) are supported. Path-specific
+owners will be added in Phase 2.
+
+#### Bot Configuration
+
+Smyklot supports multiple configuration sources with the following precedence:
+
+CLI Flags > Environment Variables > Defaults
+
+##### Available Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `quiet_success` | boolean | `false` | Emoji reactions only |
+| `allowed_commands` | string list | `[]` (all) | Allowed commands list |
+| `command_aliases` | string map | `{}` | Command aliases |
+| `command_prefix` | string | `/` | Slash command prefix |
+| `disable_mentions` | boolean | `false` | Disable mentions |
+
+##### Configuration Methods
+
+###### Environment Variables
+
+Use `SMYKLOT_` prefix with uppercase names:
+
+```yaml
+# .github/workflows/pr-commands.yml
+env:
+  SMYKLOT_QUIET_SUCCESS: "true"
+  SMYKLOT_ALLOWED_COMMANDS: "approve,merge"
+  SMYKLOT_COMMAND_PREFIX: "!"
+  SMYKLOT_DISABLE_MENTIONS: "false"
+```
+
+###### CLI Flags
+
+Pass flags to the binary:
+
+```bash
+./smyklot-github-action \
+  --quiet-success=true \
+  --allowed-commands=approve,merge \
+  --command-aliases='{"app":"approve","m":"merge"}' \
+  --command-prefix="!" \
+  --disable-mentions=false
+```
+
+##### Examples
+
+###### Example 1: Quiet Mode
+
+Only show emoji reactions, no success comments:
+
+```yaml
+env:
+  SMYKLOT_QUIET_SUCCESS: "true"
+```
+
+Result: User sees only ✅ reaction, no "PR Approved" comment.
+
+###### Example 2: Custom Prefix
+
+Use `!` instead of `/` for commands:
+
+```yaml
+env:
+  SMYKLOT_COMMAND_PREFIX: "!"
+```
+
+Users can now use `!approve` and `!merge`.
+
+###### Example 3: Command Aliases
+
+Create shortcuts for commands:
+
+```yaml
+env:
+  SMYKLOT_COMMAND_ALIASES: '{"app":"approve","a":"approve","m":"merge"}'
+```
+
+Users can use `/app`, `/a`, or `/m` as shortcuts.
+
+###### Example 4: Restrict Commands
+
+Only allow approve command:
+
+```yaml
+env:
+  SMYKLOT_ALLOWED_COMMANDS: "approve"
+```
+
+The `/merge` command will be ignored.
+
+###### Example 5: Disable Mentions
+
+Only allow slash commands:
+
+```yaml
+env:
+  SMYKLOT_DISABLE_MENTIONS: "true"
+```
+
+`@smyklot approve` will no longer work, only `/approve`.
 
 ## Usage
 
@@ -63,6 +170,7 @@ Comment on any pull request:
 ```
 
 Smyklot will:
+
 1. Check if you're a global owner in `.github/CODEOWNERS`
 2. Approve the PR via GitHub API
 3. Add ✅ reaction to your comment
@@ -76,6 +184,7 @@ Comment on any pull request:
 ```
 
 Smyklot will:
+
 1. Check if you're a global owner
 2. Verify the PR is mergeable
 3. Merge the PR via GitHub API
@@ -84,6 +193,7 @@ Smyklot will:
 ### Error Handling
 
 If you're not authorized, Smyklot will:
+
 - Add ❌ reaction to your comment
 - Post a comment explaining who can approve/merge
 
@@ -155,7 +265,8 @@ ginkgo -r pkg/commands/
 task test:watch
 ```
 
-**Current test coverage: 98 tests passing**
+Current test coverage: 98 tests passing
+
 - 20 command parser tests
 - 12 CODEOWNERS parser tests
 - 30 permission checker tests
@@ -178,11 +289,13 @@ task test:watch
 
 ### Permission System
 
-**Phase 1 (Current):**
+Phase 1 (Current):
+
 - Only global owners (`* @username`) are supported
 - Global owners can approve/merge any PR
 
-**Phase 2 (Planned):**
+Phase 2 (Planned):
+
 - Path-specific ownership patterns
 - Scoped permissions based on changed files
 
@@ -244,6 +357,7 @@ MIT License - see [LICENSE](LICENSE) for details
 ## Acknowledgments
 
 Built with:
+
 - [Ginkgo](https://github.com/onsi/ginkgo) - BDD testing framework
 - [Gomega](https://github.com/onsi/gomega) - Matcher library
 - [mise](https://mise.jdx.dev/) - Tool version manager

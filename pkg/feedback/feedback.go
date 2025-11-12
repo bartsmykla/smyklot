@@ -11,7 +11,7 @@ import (
 
 // NewSuccess creates success feedback
 //
-// Success feedback uses only an emoji reaction (✅); no comment is posted
+//	uses only an emoji reaction (✅); no comment is posted
 func NewSuccess() *Feedback {
 	return &Feedback{
 		Type:    Success,
@@ -86,7 +86,7 @@ func NewAlreadyApproved(approver string) *Feedback {
 	message := fmt.Sprintf(
 		"⚠️ **Already Approved**\n\n"+
 			"This pull request has already been approved by `%s`.\n\n"+
-			"No action taken.",
+			"No action has been taken.",
 		approver,
 	)
 
@@ -101,7 +101,7 @@ func NewAlreadyApproved(approver string) *Feedback {
 func NewAlreadyMerged() *Feedback {
 	message := "⚠️ **Already Merged**\n\n" +
 		"This pull request has already been merged.\n\n" +
-		"No action taken."
+		"No action has been taken."
 
 	return &Feedback{
 		Type:    Warning,
@@ -162,12 +162,16 @@ func NewNoCodeownersFile() *Feedback {
 // NewApprovalSuccess creates success feedback for a successful PR approval
 //
 // The message acknowledges the approver and indicates the approval was successful
-func NewApprovalSuccess(approver string) *Feedback {
-	message := fmt.Sprintf(
-		"✅ **PR Approved**\n\n"+
-			"This pull request has been approved by `%s`.",
-		approver,
-	)
+// If quietSuccess is true, only an emoji reaction is used (no comment)
+func NewApprovalSuccess(approver string, quietSuccess bool) *Feedback {
+	message := ""
+	if !quietSuccess {
+		message = fmt.Sprintf(
+			"✅ **PR Approved**\n\n"+
+				"This pull request has been approved by `%s`.",
+			approver,
+		)
+	}
 
 	return &Feedback{
 		Type:    Success,
@@ -197,12 +201,16 @@ func NewApprovalFailed(reason string) *Feedback {
 // NewMergeSuccess creates success feedback for a successful PR merge
 //
 // The message acknowledges who merged the PR
-func NewMergeSuccess(author string) *Feedback {
-	message := fmt.Sprintf(
-		"✅ **PR Merged**\n\n"+
-			"This pull request has been successfully merged by `%s`.",
-		author,
-	)
+// If quietSuccess is true, only an emoji reaction is used (no comment)
+func NewMergeSuccess(author string, quietSuccess bool) *Feedback {
+	message := ""
+	if !quietSuccess {
+		message = fmt.Sprintf(
+			"✅ **PR Merged**\n\n"+
+				"This pull request has been successfully merged by `%s`.",
+			author,
+		)
+	}
 
 	return &Feedback{
 		Type:    Success,
@@ -260,10 +268,10 @@ func (f *Feedback) String() string {
 
 // RequiresComment returns true if the feedback requires a comment
 //
-// Success feedback only uses emoji reactions
-// Error and warning feedback require comments with details
+// Feedback with an empty message only uses emoji reactions
+// Feedback with a message requires a comment to be posted
 func (f *Feedback) RequiresComment() bool {
-	return f.Type != Success
+	return f.Message != ""
 }
 
 // formatApproverList formats a list of approvers as a Markdown bulleted list

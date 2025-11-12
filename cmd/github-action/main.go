@@ -12,8 +12,10 @@ import (
 
 	"github.com/jferrl/go-githubauth"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/bartsmykla/smyklot/pkg/commands"
+	"github.com/bartsmykla/smyklot/pkg/config"
 	"github.com/bartsmykla/smyklot/pkg/feedback"
 	"github.com/bartsmykla/smyklot/pkg/github"
 	"github.com/bartsmykla/smyklot/pkg/permissions"
@@ -52,8 +54,8 @@ const (
 	errInvalidInstallID    = "invalid installation ID"
 )
 
-// Config holds the runtime configuration for the action.
-type Config struct {
+// RuntimeConfig holds the runtime configuration for the action
+type RuntimeConfig struct {
 	Token               string
 	CommentBody         string
 	CommentID           string
@@ -67,7 +69,11 @@ type Config struct {
 	InstallationID      string
 }
 
-var config Config
+var (
+	runtimeConfig RuntimeConfig
+	botConfig     *config.Config
+	v             *viper.Viper
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "smyklot-github-action",
@@ -81,23 +87,50 @@ commands like /approve and /merge based on user permissions.`,
 }
 
 func init() {
+	// Initialize Viper
+	v = viper.New()
+	config.SetupViper(v)
+
 	// Define CLI flags that can override environment variables
-	rootCmd.Flags().StringVar(&config.Token, flagToken, "", descToken)
+	rootCmd.Flags().StringVar(&runtimeConfig.Token, flagToken, "", descToken)
 	rootCmd.Flags().StringVar(
-		&config.CommentBody, flagCommentBody, "", descCommentBody,
+		&runtimeConfig.CommentBody, flagCommentBody, "", descCommentBody,
 	)
-	rootCmd.Flags().StringVar(&config.CommentID, flagCommentID, "", descCommentID)
-	rootCmd.Flags().StringVar(&config.PRNumber, flagPRNumber, "", descPRNumber)
-	rootCmd.Flags().StringVar(&config.RepoOwner, flagRepoOwner, "", descRepoOwner)
-	rootCmd.Flags().StringVar(&config.RepoName, flagRepoName, "", descRepoName)
+	rootCmd.Flags().StringVar(&runtimeConfig.CommentID, flagCommentID, "", descCommentID)
+	rootCmd.Flags().StringVar(&runtimeConfig.PRNumber, flagPRNumber, "", descPRNumber)
+	rootCmd.Flags().StringVar(&runtimeConfig.RepoOwner, flagRepoOwner, "", descRepoOwner)
+	rootCmd.Flags().StringVar(&runtimeConfig.RepoName, flagRepoName, "", descRepoName)
 	rootCmd.Flags().StringVar(
-		&config.CommentAuthor, flagCommentAuthor, "", descCommentAuthor,
+		&runtimeConfig.CommentAuthor, flagCommentAuthor, "", descCommentAuthor,
 	)
+
+	// Bind Viper config flags
+	rootCmd.Flags().Bool(config.KeyQuietSuccess, false, "Disable success comments (emoji only)")
+	rootCmd.Flags().StringSlice(config.KeyAllowedCommands, []string{}, "Allowed commands (empty = all)")
+	rootCmd.Flags().StringToString(config.KeyCommandAliases, map[string]string{}, "Command aliases (JSON)")
+	rootCmd.Flags().String(config.KeyCommandPrefix, config.DefaultCommandPrefix, "Command prefix")
+	rootCmd.Flags().Bool(config.KeyDisableMentions, false, "Disable mention-style commands")
+
+	// Bind flags to Viper
+	bindViperFlags([]string{
+		config.KeyQuietSuccess,
+		config.KeyAllowedCommands,
+		config.KeyCommandAliases,
+		config.KeyCommandPrefix,
+		config.KeyDisableMentions,
+	})
 }
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
+	}
+}
+
+// bindViperFlags binds multiple flags to Viper
+func bindViperFlags(keys []string) {
+	for _, key := range keys {
+		_ = v.BindPFlag(key, rootCmd.Flags().Lookup(key))
 	}
 }
 
@@ -113,14 +146,14 @@ func run(_ *cobra.Command, _ []string) error {
 	}
 
 	// Parse the command from the comment
-	parsedCmd, err := commands.ParseCommand(config.CommentBody)
+	parsedCmd, err := commands.ParseCommand(runtimeConfig.CommentBody, botConfig)
 	if err != nil {
 		// Not a valid command, ignore silently
 		return nil
 	}
 
 	// Get GitHub App installation token if configured
-	token := config.Token
+	token := runtimeConfig.Token
 	installationToken, err := getInstallationToken()
 	if err != nil {
 		return err
@@ -149,18 +182,18 @@ func run(_ *cobra.Command, _ []string) error {
 	}
 
 	// Convert string IDs to integers
-	prNum, err := strconv.Atoi(config.PRNumber)
+	prNum, err := strconv.Atoi(runtimeConfig.PRNumber)
 	if err != nil {
-		return NewInputError(ErrInvalidInput, config.PRNumber, errInvalidPRNum)
+		return NewInputError(ErrInvalidInput, runtimeConfig.PRNumber, errInvalidPRNum)
 	}
 
-	commentIDNum, err := strconv.Atoi(config.CommentID)
+	commentIDNum, err := strconv.Atoi(runtimeConfig.CommentID)
 	if err != nil {
-		return NewInputError(ErrInvalidInput, config.CommentID, errInvalidComment)
+		return NewInputError(ErrInvalidInput, runtimeConfig.CommentID, errInvalidComment)
 	}
 
 	// Check if the user has permission to execute this command
-	canApprove, err := checker.CanApprove(config.CommentAuthor, rootPath)
+	canApprove, err := checker.CanApprove(runtimeConfig.CommentAuthor, rootPath)
 	if err != nil {
 		return NewGitHubError(ErrPermissionCheck, err)
 	}
@@ -182,83 +215,52 @@ func run(_ *cobra.Command, _ []string) error {
 	}
 }
 
-// loadConfig loads configuration from environment variables if not set via flags.
+// loadConfig loads configuration from environment variables if not set via flags
 func loadConfig() error {
-	if config.Token == "" {
-		config.Token = os.Getenv(envGitHubToken)
-	}
+	loadEnvIfEmpty(&runtimeConfig.Token, envGitHubToken)
+	loadEnvIfEmpty(&runtimeConfig.CommentBody, envCommentBody)
+	loadEnvIfEmpty(&runtimeConfig.CommentID, envCommentID)
+	loadEnvIfEmpty(&runtimeConfig.PRNumber, envPRNumber)
+	loadEnvIfEmpty(&runtimeConfig.RepoOwner, envRepoOwner)
+	loadEnvIfEmpty(&runtimeConfig.RepoName, envRepoName)
+	loadEnvIfEmpty(&runtimeConfig.CommentAuthor, envCommentAuthor)
+	loadEnvIfEmpty(&runtimeConfig.GitHubAppPrivateKey, envGitHubAppPrivateKey)
+	loadEnvIfEmpty(&runtimeConfig.GitHubAppClientID, envGitHubAppClientID)
+	loadEnvIfEmpty(&runtimeConfig.GitHubAppID, envGitHubAppID)
+	loadEnvIfEmpty(&runtimeConfig.InstallationID, envInstallationID)
 
-	if config.CommentBody == "" {
-		config.CommentBody = os.Getenv(envCommentBody)
-	}
-
-	if config.CommentID == "" {
-		config.CommentID = os.Getenv(envCommentID)
-	}
-
-	if config.PRNumber == "" {
-		config.PRNumber = os.Getenv(envPRNumber)
-	}
-
-	if config.RepoOwner == "" {
-		config.RepoOwner = os.Getenv(envRepoOwner)
-	}
-
-	if config.RepoName == "" {
-		config.RepoName = os.Getenv(envRepoName)
-	}
-
-	if config.CommentAuthor == "" {
-		config.CommentAuthor = os.Getenv(envCommentAuthor)
-	}
-
-	if config.GitHubAppPrivateKey == "" {
-		config.GitHubAppPrivateKey = os.Getenv(envGitHubAppPrivateKey)
-	}
-
-	if config.GitHubAppClientID == "" {
-		config.GitHubAppClientID = os.Getenv(envGitHubAppClientID)
-	}
-
-	if config.GitHubAppID == "" {
-		config.GitHubAppID = os.Getenv(envGitHubAppID)
-	}
-
-	if config.InstallationID == "" {
-		config.InstallationID = os.Getenv(envInstallationID)
-	}
+	// Load bot configuration from Viper
+	botConfig = config.LoadFromViper(v)
 
 	return nil
 }
 
-// validateConfig validates that all required configuration is present.
+// loadEnvIfEmpty loads environment variable into target if target is empty
+func loadEnvIfEmpty(target *string, envVar string) {
+	if *target == "" {
+		*target = os.Getenv(envVar)
+	}
+}
+
+// validateConfig validates that all required configuration is present
 func validateConfig() error {
-	if config.Token == "" {
-		return NewEnvVarError(ErrMissingEnvVar, envGitHubToken)
+	requiredFields := []struct {
+		value  string
+		envVar string
+	}{
+		{runtimeConfig.Token, envGitHubToken},
+		{runtimeConfig.CommentBody, envCommentBody},
+		{runtimeConfig.CommentID, envCommentID},
+		{runtimeConfig.PRNumber, envPRNumber},
+		{runtimeConfig.RepoOwner, envRepoOwner},
+		{runtimeConfig.RepoName, envRepoName},
+		{runtimeConfig.CommentAuthor, envCommentAuthor},
 	}
 
-	if config.CommentBody == "" {
-		return NewEnvVarError(ErrMissingEnvVar, envCommentBody)
-	}
-
-	if config.CommentID == "" {
-		return NewEnvVarError(ErrMissingEnvVar, envCommentID)
-	}
-
-	if config.PRNumber == "" {
-		return NewEnvVarError(ErrMissingEnvVar, envPRNumber)
-	}
-
-	if config.RepoOwner == "" {
-		return NewEnvVarError(ErrMissingEnvVar, envRepoOwner)
-	}
-
-	if config.RepoName == "" {
-		return NewEnvVarError(ErrMissingEnvVar, envRepoName)
-	}
-
-	if config.CommentAuthor == "" {
-		return NewEnvVarError(ErrMissingEnvVar, envCommentAuthor)
+	for _, field := range requiredFields {
+		if field.value == "" {
+			return NewEnvVarError(ErrMissingEnvVar, field.envVar)
+		}
 	}
 
 	return nil
@@ -272,8 +274,8 @@ func postFeedback(
 	reaction github.ReactionType,
 ) error {
 	if err := client.PostComment(
-		config.RepoOwner,
-		config.RepoName,
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
 		prNum,
 		message,
 	); err != nil {
@@ -281,8 +283,8 @@ func postFeedback(
 	}
 
 	if err := client.AddReaction(
-		config.RepoOwner,
-		config.RepoName,
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
 		commentID,
 		reaction,
 	); err != nil {
@@ -299,8 +301,8 @@ func addReaction(
 	reaction github.ReactionType,
 ) error {
 	if err := client.AddReaction(
-		config.RepoOwner,
-		config.RepoName,
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
 		commentID,
 		reaction,
 	); err != nil {
@@ -339,7 +341,7 @@ func handleUnauthorized(
 	checker *permissions.Checker,
 	prNum, commentID int,
 ) error {
-	fb := feedback.NewUnauthorized(config.CommentAuthor, checker.GetApprovers())
+	fb := feedback.NewUnauthorized(runtimeConfig.CommentAuthor, checker.GetApprovers())
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
 }
@@ -352,7 +354,7 @@ func handleApprove(client *github.Client, prNum, commentID int) error {
 	}
 
 	// Approve the PR
-	if err := client.ApprovePR(config.RepoOwner, config.RepoName, prNum); err != nil {
+	if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
 		return postOperationFailure(
 			client,
 			prNum,
@@ -364,7 +366,7 @@ func handleApprove(client *github.Client, prNum, commentID int) error {
 	}
 
 	// Post-success feedback
-	fb := feedback.NewApprovalSuccess(config.CommentAuthor)
+	fb := feedback.NewApprovalSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
@@ -377,7 +379,7 @@ func handleMerge(client *github.Client, prNum, commentID int) error {
 	}
 
 	// Get PR info to check if it's mergeable
-	info, err := client.GetPRInfo(config.RepoOwner, config.RepoName, prNum)
+	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
 	if err != nil {
 		return postOperationFailure(
 			client,
@@ -395,7 +397,7 @@ func handleMerge(client *github.Client, prNum, commentID int) error {
 	}
 
 	// Merge the PR
-	if err := client.MergePR(config.RepoOwner, config.RepoName, prNum); err != nil {
+	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
 		return postOperationFailure(
 			client,
 			prNum,
@@ -407,7 +409,7 @@ func handleMerge(client *github.Client, prNum, commentID int) error {
 	}
 
 	// Post-success feedback
-	fb := feedback.NewMergeSuccess(config.CommentAuthor)
+	fb := feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
@@ -421,18 +423,18 @@ func postNotMergeable(client *github.Client, prNum, commentID int) error {
 
 // getInstallationToken generates a GitHub App installation token if credentials are provided.
 //
-// Returns empty string if GitHub App credentials are not configured.
+// Returns an empty string if GitHub App credentials are not configured.
 // Returns the token on success.
 func getInstallationToken() (string, error) {
 	// Check if GitHub App credentials are provided
-	if config.GitHubAppPrivateKey == "" || config.InstallationID == "" {
+	if runtimeConfig.GitHubAppPrivateKey == "" || runtimeConfig.InstallationID == "" {
 		return "", nil
 	}
 
 	// Determine which ID to use (ClientID is preferred, fallback to AppID)
-	clientID := config.GitHubAppClientID
+	clientID := runtimeConfig.GitHubAppClientID
 	if clientID == "" {
-		clientID = config.GitHubAppID
+		clientID = runtimeConfig.GitHubAppID
 	}
 
 	if clientID == "" {
@@ -440,15 +442,15 @@ func getInstallationToken() (string, error) {
 	}
 
 	// Convert installation ID to int64
-	installationID, err := strconv.ParseInt(config.InstallationID, 10, 64)
+	installationID, err := strconv.ParseInt(runtimeConfig.InstallationID, 10, 64)
 	if err != nil {
-		return "", NewInputError(ErrInvalidInput, config.InstallationID, errInvalidInstallID)
+		return "", NewInputError(ErrInvalidInput, runtimeConfig.InstallationID, errInvalidInstallID)
 	}
 
 	// Create GitHub App JWT token source
 	appTokenSource, err := githubauth.NewApplicationTokenSource(
 		clientID,
-		[]byte(config.GitHubAppPrivateKey),
+		[]byte(runtimeConfig.GitHubAppPrivateKey),
 	)
 	if err != nil {
 		return "", NewGitHubError(ErrGitHubAppAuth, err)
