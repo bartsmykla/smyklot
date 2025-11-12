@@ -133,4 +133,3 @@ run:
   tests: true
   build-tags:
     - integration
-  skip-dirs-use-default: true
