@@ -4,7 +4,9 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-Smyklot is a GitHub Actions bot for automated PR approvals and merges based on CODEOWNERS files. It's built in Go using TDD methodology with Ginkgo/Gomega.
+Smyklot is a GitHub Actions bot for automated PR approvals and merges
+based on CODEOWNERS files. It's built in Go using TDD methodology with
+Ginkgo/Gomega.
 
 **Current Status**: Phase 1 complete (GitHub Actions implementation)
 **Test Coverage**: 98/98 tests passing (100%)
@@ -92,6 +94,7 @@ task lint:markdown     # markdownlint only
 ```
 
 Linters used:
+
 - `golangci-lint` v2.6.1 (Go code)
 - `markdownlint` (Markdown files)
 
@@ -111,16 +114,19 @@ Binary output: `bin/smyklot-github-action`
 Follow global `CLAUDE.md` Go style with these specifics:
 
 **Error Handling**:
+
 - Sentinel errors: `var ErrOpName = errors.New("msg")`
 - Custom errors with `Error()`, `Unwrap()`, `Is()` methods
 - See `pkg/permissions/errors.go` for patterns
 
 **Test Organization**:
+
 - Use Ginkgo `Describe/Context/It` BDD structure
 - Tag tests with `[Unit]` or `[Integration]`
 - Example: `var _ = Describe("Parser [Unit]", func() { ... })`
 
 **Imports**:
+
 - Standard library first
 - External packages second
 - Internal packages last
@@ -140,6 +146,7 @@ Follow global `CLAUDE.md` Go style with these specifics:
 Runs on: push to `main`, `feat/**`, and PRs
 
 Steps:
+
 1. Checkout code (`actions/checkout@v5.0.0`)
 2. Install mise (`jdx/mise-action@v3.4.0`)
 3. Run tests (`ginkgo -r --race --cover`)
@@ -151,6 +158,7 @@ Steps:
 Triggered by: `issue_comment` on PRs
 
 Environment variables (from GitHub context):
+
 - `GITHUB_TOKEN` - GitHub API token
 - `COMMENT_BODY` - Comment text
 - `COMMENT_ID` - Comment ID
@@ -160,6 +168,7 @@ Environment variables (from GitHub context):
 - `COMMENT_AUTHOR` - Comment author username
 
 Steps:
+
 1. Checkout code
 2. Install mise
 3. Build binary: `go build -o bin/smyklot-github-action ./cmd/github-action`
@@ -178,6 +187,7 @@ Steps:
 ### Phase 1: GitHub Actions Bot ✅
 
 **Completed**:
+
 - [x] Command parser (`/approve`, `/merge`, mentions)
 - [x] CODEOWNERS parser (global owners only)
 - [x] Permission checker (global ownership)
@@ -188,6 +198,7 @@ Steps:
 - [x] 98 tests passing (100% coverage)
 
 **Not Implemented**:
+
 - [ ] Path-specific CODEOWNERS patterns (Phase 2)
 - [ ] Self-approval prevention (Phase 2)
 - [ ] Team support in CODEOWNERS (Phase 2)
@@ -302,9 +313,11 @@ The workflows can be tested on `bartsmykla/.dotfiles`:
 
 1. Copy workflows to `.dotfiles/.github/workflows/`
 2. Create `.dotfiles/.github/CODEOWNERS`:
+
    ```text
    * @bartsmykla
    ```
+
 3. Open a test PR
 4. Comment `/approve` or `/merge`
 5. Verify reactions and API calls

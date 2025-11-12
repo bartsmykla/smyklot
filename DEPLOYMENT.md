@@ -1,5 +1,7 @@
 # Deployment Guide
 
+<!-- markdownlint-disable MD013 -->
+
 This guide covers deploying Smyklot to your GitHub repository.
 
 ## Prerequisites
@@ -174,12 +176,15 @@ To have comments appear from the GitHub App instead of the default
    - Install the app on your repository
 
 2. **Add App ID as variable and private key as secret**:
+
    ```bash
    gh variable set APP_ID --body "1197525"
-   # Private key must be in PKCS#8 format (starts with "-----BEGIN PRIVATE KEY-----")
+   # Private key must be in PKCS#8 format
+   # (starts with "-----BEGIN PRIVATE KEY-----")
    # If your key is in OpenSSH format, convert it first:
    # ssh-keygen -p -N "" -m pem -f openssh-key.pem
-   # openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in openssh-key.pem -out pkcs8-key.pem
+   # openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt \
+   #   -in openssh-key.pem -out pkcs8-key.pem
    gh secret set APP_PRIVATE_KEY < pkcs8-key.pem
    ```
 
@@ -218,14 +223,16 @@ Create a test pull request and try the commands:
 | Command | Alias | Action | Requirements |
 |---------|-------|--------|--------------|
 | `/approve` | `@smyklot approve` | Approve the PR | Listed in CODEOWNERS |
-| `/merge` | `@smyklot merge` | Merge the PR | Listed in CODEOWNERS + PR mergeable |
+| `/merge` | `@smyklot merge` | Merge the PR | CODEOWNERS + mergeable |
 
 ### Feedback System
 
 **Success** (emoji only):
+
 - ✅ - Command executed successfully
 
 **Errors** (emoji + comment):
+
 - ❌ - Unauthorized or error
 - ⚠️ - Warning (e.g., merge conflict)
 - 👀 - Processing (added immediately)
@@ -235,11 +242,13 @@ Create a test pull request and try the commands:
 ### Command Not Working
 
 1. **Check CODEOWNERS file exists**:
+
    ```bash
    cat .github/CODEOWNERS
    ```
 
 2. **Check workflow file exists**:
+
    ```bash
    cat .github/workflows/pr-commands.yml
    ```
@@ -277,6 +286,7 @@ Create a test pull request and try the commands:
 ### Permissions
 
 The workflow requires minimal permissions:
+
 - `contents: read` - Read repository files
 - `pull-requests: write` - Approve and merge PRs
 - `issues: write` - Add reactions and comments
@@ -284,6 +294,7 @@ The workflow requires minimal permissions:
 ### GITHUB_TOKEN
 
 The workflow uses the built-in `GITHUB_TOKEN` which:
+
 - Is automatically created for each workflow run
 - Has repository-scoped permissions
 - Expires after the workflow completes
@@ -305,11 +316,13 @@ env:
 To update to a new version:
 
 1. Change the version reference in workflow:
+
    ```yaml
    uses: bartsmykla/smyklot@v1.0.0  # Update this line
    ```
 
 2. Commit and push:
+
    ```bash
    git add .github/workflows/pr-commands.yml
    git commit -sS -m "chore(ci): update Smyklot to v1.0.0"
@@ -318,6 +331,6 @@ To update to a new version:
 
 ## Support
 
-- **Issues**: https://github.com/bartsmykla/smyklot/issues
-- **Discussions**: https://github.com/bartsmykla/smyklot/discussions
-- **Documentation**: https://github.com/bartsmykla/smyklot/blob/main/README.md
+- **Issues**: <https://github.com/bartsmykla/smyklot/issues>
+- **Discussions**: <https://github.com/bartsmykla/smyklot/discussions>
+- **Documentation**: <https://github.com/bartsmykla/smyklot/blob/main/README.md>
