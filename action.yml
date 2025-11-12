@@ -35,6 +35,30 @@ inputs:
     description: Comment author username
     required: false
     default: ''
+  config:
+    description: Full configuration as JSON (overrides individual settings)
+    required: false
+    default: ''
+  quiet-success:
+    description: Disable success comments (emoji only)
+    required: false
+    default: ''
+  allowed-commands:
+    description: Allowed commands (comma-separated)
+    required: false
+    default: ''
+  command-aliases:
+    description: Command aliases as JSON
+    required: false
+    default: ''
+  command-prefix:
+    description: Custom command prefix
+    required: false
+    default: ''
+  disable-mentions:
+    description: Disable @smyklot mentions
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -48,8 +72,30 @@ runs:
     - name: Build smyklot binary
       shell: bash
       run: |
-        cd ${{ github.action_path }}
+        cd ${{ github.action_path }} || exit 1
         go build -o ${{ runner.temp }}/smyklot-github-action ./cmd/github-action
+
+    - name: Parse configuration
+      id: parse-config
+      shell: bash
+      env:
+        CONFIG_JSON: ${{ inputs.config }}
+      run: |
+        # If config JSON is provided, parse it and set outputs
+        if [ -n "$CONFIG_JSON" ]; then
+          {
+            echo "quiet_success=$(echo "$CONFIG_JSON" | \
+              jq -r '.quiet_success // empty')"
+            echo "allowed_commands=$(echo "$CONFIG_JSON" | \
+              jq -r '.allowed_commands // [] | join(",")')"
+            echo "command_aliases=$(echo "$CONFIG_JSON" | \
+              jq -c '.command_aliases // {}')"
+            echo "command_prefix=$(echo "$CONFIG_JSON" | \
+              jq -r '.command_prefix // empty')"
+            echo "disable_mentions=$(echo "$CONFIG_JSON" | \
+              jq -r '.disable_mentions // empty')"
+          } >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Execute command
       shell: bash
@@ -61,4 +107,34 @@ runs:
         REPO_OWNER: ${{ inputs.repo-owner || env.REPO_OWNER }}
         REPO_NAME: ${{ inputs.repo-name || env.REPO_NAME }}
         COMMENT_AUTHOR: ${{ inputs.comment-author || env.COMMENT_AUTHOR }}
+        SMYKLOT_QUIET_SUCCESS: >-
+          ${{
+            inputs.quiet-success ||
+            env.SMYKLOT_QUIET_SUCCESS ||
+            steps.parse-config.outputs.quiet_success
+          }}
+        SMYKLOT_ALLOWED_COMMANDS: >-
+          ${{
+            inputs.allowed-commands ||
+            env.SMYKLOT_ALLOWED_COMMANDS ||
+            steps.parse-config.outputs.allowed_commands
+          }}
+        SMYKLOT_COMMAND_ALIASES: >-
+          ${{
+            inputs.command-aliases ||
+            env.SMYKLOT_COMMAND_ALIASES ||
+            steps.parse-config.outputs.command_aliases
+          }}
+        SMYKLOT_COMMAND_PREFIX: >-
+          ${{
+            inputs.command-prefix ||
+            env.SMYKLOT_COMMAND_PREFIX ||
+            steps.parse-config.outputs.command_prefix
+          }}
+        SMYKLOT_DISABLE_MENTIONS: >-
+          ${{
+            inputs.disable-mentions ||
+            env.SMYKLOT_DISABLE_MENTIONS ||
+            steps.parse-config.outputs.disable_mentions
+          }}
       run: ${{ runner.temp }}/smyklot-github-action
