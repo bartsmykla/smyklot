@@ -59,6 +59,45 @@ func (c *Client) AddReaction(owner, repo string, commentID int, reaction Reactio
 	return err
 }
 
+// RemoveReaction removes an emoji reaction from a comment
+//
+// The reaction parameter should be one of the ReactionType constants.
+// This retrieves all reactions on the comment and deletes matching ones.
+func (c *Client) RemoveReaction(owner, repo string, commentID int, reaction ReactionType) error {
+	// First, get all reactions on the comment
+	path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d/reactions", owner, repo, commentID)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return err
+	}
+
+	var reactions []map[string]interface{}
+	if err := json.Unmarshal(data, &reactions); err != nil {
+		return NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	// Find and delete matching reactions
+	for _, r := range reactions {
+		if content, ok := r["content"].(string); ok && content == string(reaction) {
+			if id, ok := r["id"].(float64); ok {
+				deletePath := fmt.Sprintf(
+					"/repos/%s/%s/issues/comments/%d/reactions/%d",
+					owner,
+					repo,
+					commentID,
+					int(id),
+				)
+				if _, err := c.makeRequest("DELETE", deletePath, nil); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // PostComment posts a comment on a pull request
 //
 // The body parameter must not be empty.

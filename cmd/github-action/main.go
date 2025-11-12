@@ -273,15 +273,27 @@ func postFeedback(
 	message string,
 	reaction github.ReactionType,
 ) error {
-	if err := client.PostComment(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
-		prNum,
-		message,
-	); err != nil {
-		return NewGitHubError(ErrPostComment, err)
+	// Only post-comment if the message is not empty
+	if message != "" {
+		if err := client.PostComment(
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			prNum,
+			message,
+		); err != nil {
+			return NewGitHubError(ErrPostComment, err)
+		}
 	}
 
+	// Remove eyes reaction after the operation completes
+	_ = client.RemoveReaction(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		commentID,
+		github.ReactionEyes,
+	)
+
+	// Add final status reaction
 	if err := client.AddReaction(
 		runtimeConfig.RepoOwner,
 		runtimeConfig.RepoName,
