@@ -39,6 +39,9 @@ var (
 
 	// ErrInitPermissions is returned when initializing permissions fails
 	ErrInitPermissions = errors.New("failed to initialize permissions")
+
+	// ErrStepSummary is returned when step summary operations fail
+	ErrStepSummary = errors.New("failed to write step summary")
 )
 
 // EnvVarError represents an error related to environment variable validation.

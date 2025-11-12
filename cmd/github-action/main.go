@@ -7,8 +7,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"text/template"
 
 	"github.com/jferrl/go-githubauth"
 	"github.com/spf13/cobra"
@@ -33,8 +36,10 @@ const (
 	envGitHubAppClientID   = "GITHUB_APP_CLIENT_ID"   //nolint:gosec // Environment variable name, not a credential
 	envGitHubAppID         = "GITHUB_APP_ID"          //nolint:gosec // Environment variable name, not a credential
 	envInstallationID      = "GITHUB_INSTALLATION_ID"
+	envStepSummary         = "GITHUB_STEP_SUMMARY"
 	rootPath               = "/"
 	emptyBaseURL           = ""
+	summaryTemplateName    = "summary"
 	flagToken              = "token"
 	flagCommentBody        = "comment-body"
 	flagCommentID          = "comment-id"
@@ -52,6 +57,39 @@ const (
 	errInvalidPRNum        = "invalid PR number"
 	errInvalidComment      = "invalid comment ID"
 	errInvalidInstallID    = "invalid installation ID"
+	stepSummaryTemplate    = `## Smyklot Configuration
+
+### Runtime Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Repository | ` + "`{{.RepoOwner}}/{{.RepoName}}`" + ` |
+| PR Number | ` + "`#{{.PRNumber}}`" + ` |
+| Comment ID | ` + "`{{.CommentID}}`" + ` |
+| Author | ` + "`@{{.CommentAuthor}}`" + ` |
+| Comment | ` + "`{{.CommentBody}}`" + ` |
+{{if .GitHubApp}}| Authentication | GitHub App |
+| App ID | ` + "`{{.AppID}}`" + ` |
+| Installation ID | ` + "`{{.InstallationID}}`" + ` |
+{{else}}| Authentication | GITHUB_TOKEN |
+{{end}}
+### Bot Configuration
+
+| Setting | Value |
+|---------|-------|
+| Quiet Success | ` + "`{{.QuietSuccess}}`" + ` |
+| Command Prefix | ` + "`{{.CommandPrefix}}`" + ` |
+| Disable Mentions | ` + "`{{.DisableMentions}}`" + ` |
+{{if .AllowedCommands}}| Allowed Commands | ` + "`{{.AllowedCommands}}`" + ` |
+{{else}}| Allowed Commands | All commands allowed |
+{{end}}
+{{if .CommandAliases}}
+### Command Aliases
+
+| Alias | Command |
+|-------|----------|
+{{range $alias, $cmd := .CommandAliases}}| ` + "`{{$alias}}`" + ` | ` + "`{{$cmd}}`" + ` |
+{{end}}{{end}}`
 )
 
 // RuntimeConfig holds the runtime configuration for the action
@@ -67,6 +105,24 @@ type RuntimeConfig struct {
 	GitHubAppClientID   string
 	GitHubAppID         string
 	InstallationID      string
+}
+
+// stepSummaryData holds data for the step summary template.
+type stepSummaryData struct {
+	RepoOwner       string
+	RepoName        string
+	PRNumber        string
+	CommentID       string
+	CommentAuthor   string
+	CommentBody     string
+	GitHubApp       bool
+	AppID           string
+	InstallationID  string
+	QuietSuccess    bool
+	CommandPrefix   string
+	DisableMentions bool
+	AllowedCommands string
+	CommandAliases  map[string]string
 }
 
 var (
@@ -143,6 +199,12 @@ func run(_ *cobra.Command, _ []string) error {
 	// Validate required configuration
 	if err := validateConfig(); err != nil {
 		return err
+	}
+
+	// Write a step summary with effective configuration
+	if err := writeStepSummary(); err != nil {
+		// Don't fail if we can't write a summary, just log and continue
+		_, _ = fmt.Fprintf(os.Stderr, "Warning: failed to write step summary: %v\n", err)
 	}
 
 	// Parse the command from the comment
@@ -481,4 +543,55 @@ func getInstallationToken() (string, error) {
 	}
 
 	return token.AccessToken, nil
+}
+
+// writeStepSummary writes the effective configuration to GitHub Actions step summary.
+func writeStepSummary() error {
+	summaryFile := os.Getenv(envStepSummary)
+	if summaryFile == "" {
+		// Not running in GitHub Actions, skip
+		return nil
+	}
+
+	//nolint:gosec // summaryFile is from the trusted GitHub Actions environment
+	file, err := os.OpenFile(summaryFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return NewGitHubError(ErrStepSummary, err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	tmpl, err := template.New(summaryTemplateName).Parse(stepSummaryTemplate)
+	if err != nil {
+		return NewGitHubError(ErrStepSummary, err)
+	}
+
+	var allowedCommands string
+	if len(botConfig.AllowedCommands) > 0 {
+		allowedCommands = strings.Join(botConfig.AllowedCommands, ", ")
+	}
+
+	data := stepSummaryData{
+		RepoOwner:       runtimeConfig.RepoOwner,
+		RepoName:        runtimeConfig.RepoName,
+		PRNumber:        runtimeConfig.PRNumber,
+		CommentID:       runtimeConfig.CommentID,
+		CommentAuthor:   runtimeConfig.CommentAuthor,
+		CommentBody:     runtimeConfig.CommentBody,
+		GitHubApp:       runtimeConfig.GitHubAppPrivateKey != "",
+		AppID:           runtimeConfig.GitHubAppID,
+		InstallationID:  runtimeConfig.InstallationID,
+		QuietSuccess:    botConfig.QuietSuccess,
+		CommandPrefix:   botConfig.CommandPrefix,
+		DisableMentions: botConfig.DisableMentions,
+		AllowedCommands: allowedCommands,
+		CommandAliases:  botConfig.CommandAliases,
+	}
+
+	if err := tmpl.Execute(file, data); err != nil {
+		return NewGitHubError(ErrStepSummary, err)
+	}
+
+	return nil
 }
