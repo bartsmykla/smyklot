@@ -64,6 +64,37 @@
 - Required reviews
 - Branch protection rules
 
+### 3. Docker Image Workflow Optimization (v1.4.0)
+
+**Problem**: Workflows were building smyklot from source on every run, which was inefficient. The `.dotfiles` repository workflow failed because it tried to build source code that doesn't exist there.
+
+**Solution**: Replace source build with pre-built Docker image in all workflows.
+
+**Implementation**:
+
+- Updated `poll-reactions` workflow to use `ghcr.io/bartsmykla/smyklot:1.4.0`
+- Updated `pr-commands` workflow to use Docker image
+- Removed mise installation, Go caching, and build steps
+- Simplified workflows from 6 steps to 2-3 steps
+- Added GitHub App token generation to `.dotfiles` workflows
+
+**Files changed**:
+
+- `.github/workflows/poll-reactions.yml` - Use Docker image
+- `.github/workflows/pr-commands.yml` - Use Docker image
+
+**Benefits**:
+
+- Faster workflow execution (no build time)
+- Consistent execution environment
+- Works in repositories without source code
+- Reduced workflow complexity
+
+**Deployed to**:
+
+- smyklot repository (bartsmykla/smyklot)
+- .dotfiles repository (smykla-labs/.dotfiles) - PR #38
+
 ## What Needs to Be Done Next
 
 ### Short Term (Phase 1 Completion)
