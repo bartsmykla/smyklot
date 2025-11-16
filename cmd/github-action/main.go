@@ -270,16 +270,24 @@ func run(_ *cobra.Command, _ []string) error {
 		return handleUnauthorized(client, checker, prNum, commentIDNum)
 	}
 
-	// Execute the command based on type
-	switch parsedCmd.Type {
-	case commands.CommandApprove:
-		return handleApprove(client, prNum, commentIDNum)
-	case commands.CommandMerge:
-		return handleMerge(client, prNum, commentIDNum)
-	default:
-		// Unknown command type, ignore
-		return nil
+	// Execute all commands in order
+	for _, cmdType := range parsedCmd.Commands {
+		switch cmdType {
+		case commands.CommandApprove:
+			if err := handleApprove(client, prNum, commentIDNum); err != nil {
+				return err
+			}
+		case commands.CommandMerge:
+			if err := handleMerge(client, prNum, commentIDNum); err != nil {
+				return err
+			}
+		default:
+			// Unknown command type, ignore
+			continue
+		}
 	}
+
+	return nil
 }
 
 // loadConfig loads configuration from environment variables if not set via flags

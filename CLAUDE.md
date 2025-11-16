@@ -9,7 +9,7 @@ based on CODEOWNERS files. It's built in Go using TDD methodology with
 Ginkgo/Gomega.
 
 **Current Status**: Phase 1 complete (GitHub Actions implementation)
-**Test Coverage**: 119/119 tests passing (100%)
+**Test Coverage**: 130/130 tests passing (100%)
 
 ## Architecture
 
@@ -44,9 +44,11 @@ smyklot/
 - Parses commands from PR comments
 - Supports slash (`/approve`), mention (`@smyklot approve`), and bare
   (`approve`, `accept`, `lgtm`, `merge`) command formats
-- Three formats: slash, mention, bare (exact match only)
-- Returns `Command` type with parsed action
-- 41 tests covering all parsing scenarios
+- **Multi-command support**: Parse multiple commands in single comment
+  (`approve merge`, `lgtm\nmerge`)
+- Three formats: slash, mention, bare (word-based matching)
+- Returns `Command` type with parsed actions
+- 52 tests covering all parsing scenarios including multi-command
 
 #### `pkg/permissions`
 
@@ -191,13 +193,14 @@ Steps:
 **Completed**:
 
 - [x] Command parser (slash, mention, and bare commands)
+- [x] Multi-command support (multiple commands in single comment)
 - [x] CODEOWNERS parser (global owners only)
 - [x] Permission checker (global ownership)
 - [x] Feedback system (reactions + comments)
 - [x] GitHub API client (approve, merge, reactions)
 - [x] GitHub Actions workflows
 - [x] Documentation (README, CLAUDE.md)
-- [x] 119 tests passing (100% coverage)
+- [x] 130 tests passing (100% coverage)
 
 **Not Implemented**:
 

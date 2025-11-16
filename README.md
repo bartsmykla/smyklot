@@ -16,7 +16,7 @@ managed through GitHub's native `.github/CODEOWNERS` file.
 - Automated feedback with emoji reactions
 - Security-first design following GitHub Actions best practices
 - Zero external dependencies - runs entirely on GitHub Actions
-- TDD implementation with 119 passing tests
+- TDD implementation with 130 passing tests
 
 ## Quick Start
 
@@ -175,11 +175,28 @@ Smyklot responds to these commands in PR comments:
 
 **Command Formats**:
 
-- **Slash commands**: `/approve`, `/merge` (highest priority)
-- **Mention commands**: `@smyklot approve`, `@smyklot merge` (medium priority)
-- **Bare commands**: `approve`, `accept`, `lgtm`, `merge` (lowest priority, exact match only)
+- **Slash commands**: `/approve`, `/merge`
+- **Mention commands**: `@smyklot approve`, `@smyklot merge`
+- **Bare commands**: `approve`, `accept`, `lgtm`, `merge`
 
 All commands are case-insensitive.
+
+**Multiple Commands**:
+
+You can use multiple non-contradicting commands in a single comment:
+
+```text
+approve merge
+```
+
+or
+
+```text
+lgtm
+merge
+```
+
+Commands will be executed in order: approve first, then merge.
 
 ### Example: Approving a PR
 
@@ -297,9 +314,9 @@ ginkgo -r pkg/commands/
 task test:watch
 ```
 
-Current test coverage: 119 tests passing
+Current test coverage: 130 tests passing
 
-- 41 command parser tests
+- 52 command parser tests
 - 12 CODEOWNERS parser tests
 - 30 permission checker tests
 - 30 feedback system tests

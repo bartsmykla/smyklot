@@ -51,78 +51,116 @@ func ParseCommand(commentBody string, cfg *config.Config) (Command, error) {
 	}
 
 	cmd := Command{
-		Raw:     commentBody,
-		Type:    CommandUnknown,
-		IsValid: false,
+		Raw:      commentBody,
+		Type:     CommandUnknown,
+		Commands: []CommandType{},
+		IsValid:  false,
 	}
 
 	if commentBody == "" || strings.TrimSpace(commentBody) == "" {
 		return cmd, nil
 	}
 
-	// Build slash command regex dynamically based on the prefix
-	slashPattern := fmt.Sprintf(`(?i)^[\s]*%s(\w+)`, regexp.QuoteMeta(cfg.CommandPrefix))
-	slashCommandRegex := regexp.MustCompile(slashPattern)
+	// Collect all commands found in the text
+	commandsFound := make(map[CommandType]bool)
 
-	// Try to match a slash command first (higher priority)
-	if matches := slashCommandRegex.FindStringSubmatch(commentBody); len(matches) > 1 {
-		commandName := strings.ToLower(matches[1])
+	// Find all slash commands
+	findSlashCommands(commentBody, cfg, commandsFound)
 
-		if processCommand(commandName, cfg, &cmd) {
-			return cmd, nil
-		}
-
-		// Invalid slash command found - return unknown
-		return cmd, nil
-	}
-
-	// Try to match a mention command if not disabled
+	// Find all mention commands if not disabled
 	if !cfg.DisableMentions {
-		if matches := mentionCommandRegex.FindStringSubmatch(commentBody); len(matches) > 1 {
-			commandName := strings.ToLower(matches[1])
-
-			if processCommand(commandName, cfg, &cmd) {
-				return cmd, nil
-			}
-
-			// Invalid mention command found - return unknown
-			return cmd, nil
-		}
+		findMentionCommands(commentBody, cfg, commandsFound)
 	}
 
-	// Try to match a bare command if not disabled (lowest priority)
-	// Bare commands must be exact matches (no extra text before or after)
+	// Find bare commands if not disabled (check each word)
 	if !cfg.DisableBareCommands {
-		trimmedBody := strings.TrimSpace(commentBody)
-		commandName := strings.ToLower(trimmedBody)
-
-		if processCommand(commandName, cfg, &cmd) {
-			return cmd, nil
-		}
+		findBareCommands(commentBody, cfg, commandsFound)
 	}
 
-	// No command found
+	// Convert map to slice (deduplicated and ordered)
+	commands := buildCommandList(commandsFound)
+
+	// Populate the command struct
+	if len(commands) > 0 {
+		cmd.Commands = commands
+		cmd.Type = commands[0] // For backward compatibility
+		cmd.IsValid = true
+	}
+
 	return cmd, nil
 }
 
-// processCommand resolves aliases, validates the command, and updates the cmd struct
-// Returns true if the command was valid and processed successfully
-func processCommand(commandName string, cfg *config.Config, cmd *Command) bool {
+// findSlashCommands finds all slash commands in the comment body
+func findSlashCommands(commentBody string, cfg *config.Config, commandsFound map[CommandType]bool) {
+	// Build slash command regex dynamically based on the prefix
+	slashPattern := fmt.Sprintf(`(?i)%s(\w+)`, regexp.QuoteMeta(cfg.CommandPrefix))
+	slashCommandRegex := regexp.MustCompile(slashPattern)
+
+	slashMatches := slashCommandRegex.FindAllStringSubmatch(commentBody, -1)
+	for _, matches := range slashMatches {
+		if len(matches) > 1 {
+			commandName := strings.ToLower(matches[1])
+			if cmdType := resolveCommand(commandName, cfg); cmdType != CommandUnknown {
+				commandsFound[cmdType] = true
+			}
+		}
+	}
+}
+
+// findMentionCommands finds all mention commands in the comment body
+func findMentionCommands(commentBody string, cfg *config.Config, commandsFound map[CommandType]bool) {
+	mentionMatches := mentionCommandRegex.FindAllStringSubmatch(commentBody, -1)
+	for _, matches := range mentionMatches {
+		if len(matches) > 1 {
+			commandName := strings.ToLower(matches[1])
+			if cmdType := resolveCommand(commandName, cfg); cmdType != CommandUnknown {
+				commandsFound[cmdType] = true
+			}
+		}
+	}
+}
+
+// findBareCommands finds all bare commands in the comment body
+func findBareCommands(commentBody string, cfg *config.Config, commandsFound map[CommandType]bool) {
+	// Split by whitespace and newlines
+	words := strings.Fields(commentBody)
+	for _, word := range words {
+		word = strings.ToLower(strings.TrimSpace(word))
+		if cmdType := resolveCommand(word, cfg); cmdType != CommandUnknown {
+			commandsFound[cmdType] = true
+		}
+	}
+}
+
+// buildCommandList converts the commands map to an ordered slice
+func buildCommandList(commandsFound map[CommandType]bool) []CommandType {
+	var commands []CommandType
+	// Maintain consistent order: approve then merge
+	if commandsFound[CommandApprove] {
+		commands = append(commands, CommandApprove)
+	}
+	if commandsFound[CommandMerge] {
+		commands = append(commands, CommandMerge)
+	}
+
+	return commands
+}
+
+// resolveCommand resolves aliases, validates the command, and returns the CommandType
+// Returns CommandUnknown if the command is invalid or not allowed
+func resolveCommand(commandName string, cfg *config.Config) CommandType {
 	// Resolve alias
 	commandName = cfg.ResolveAlias(commandName)
 
 	cmdType, ok := validCommands[commandName]
 	if !ok {
-		return false
+		return CommandUnknown
 	}
 
 	// Check if command is allowed
 	if !cfg.IsCommandAllowed(commandName) {
-		return false
+		return CommandUnknown
 	}
 
-	cmd.Type = cmdType
-	cmd.IsValid = true
-
-	return true
+	return cmdType
 }

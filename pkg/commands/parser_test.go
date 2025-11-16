@@ -154,18 +154,20 @@ Thanks for the PR!`
 			})
 		})
 
-		Context("when parsing multiple commands in the same comment", func() {
-			It("should prioritize the first command found", func() {
+		Context("when parsing multiple commands in the same comment (legacy)", func() {
+			It("should set Type to first command for backward compatibility", func() {
 				cmd, err := commands.ParseCommand("/approve /merge", nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands).To(HaveLen(2))
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 
-			It("should prioritize slash command over mention command", func() {
+			It("should find all commands regardless of format", func() {
 				cmd, err := commands.ParseCommand("/merge @smyklot approve", nil)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands).To(ContainElements(commands.CommandApprove, commands.CommandMerge))
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 		})
@@ -226,18 +228,20 @@ Thanks for the PR!`
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 
-			It("should NOT parse bare commands with extra text before", func() {
+			It("should parse bare commands with extra text before", func() {
 				cmd, err := commands.ParseCommand("please approve", nil)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(cmd.Type).To(Equal(commands.CommandUnknown))
-				Expect(cmd.IsValid).To(BeFalse())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
 			})
 
-			It("should NOT parse bare commands with extra text after", func() {
+			It("should parse bare commands with extra text after", func() {
 				cmd, err := commands.ParseCommand("approve this", nil)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(cmd.Type).To(Equal(commands.CommandUnknown))
-				Expect(cmd.IsValid).To(BeFalse())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
 			})
 
 			It("should prioritize slash commands over bare commands", func() {
@@ -311,8 +315,10 @@ Thanks for the PR!`
 
 				cmd, err := commands.ParseCommand("@smyklot approve", cfg)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(cmd.Type).To(Equal(commands.CommandUnknown))
-				Expect(cmd.IsValid).To(BeFalse())
+				// Still finds "approve" as bare command
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
 			})
 
 			It("should still parse slash commands when mentions are disabled", func() {
@@ -408,6 +414,80 @@ Thanks for the PR!`
 				cmd, err := commands.ParseCommand("@smyklot approve", cfg)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+		})
+
+		Context("when parsing multiple commands", func() {
+			It("should parse multiple bare commands separated by space", func() {
+				cmd, err := commands.ParseCommand("approve merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse multiple bare commands separated by newline", func() {
+				cmd, err := commands.ParseCommand("approve\nmerge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse multiple slash commands", func() {
+				cmd, err := commands.ParseCommand("/approve /merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse multiple mention commands", func() {
+				cmd, err := commands.ParseCommand("@smyklot approve @smyklot merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse mixed command formats", func() {
+				cmd, err := commands.ParseCommand("/approve @smyklot merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should handle duplicate commands", func() {
+				cmd, err := commands.ParseCommand("approve approve merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse lgtm and merge together", func() {
+				cmd, err := commands.ParseCommand("lgtm merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should ignore unknown words in multi-command text", func() {
+				cmd, err := commands.ParseCommand("please approve and merge this", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 		})

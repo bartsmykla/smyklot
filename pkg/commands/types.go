@@ -17,7 +17,12 @@ const (
 // Command represents a parsed command from a comment
 type Command struct {
 	// Type is the command type (approve, merge, or unknown)
+	//
+	// Deprecated: Use Commands field for multiple command support
 	Type CommandType
+
+	// Commands is the list of parsed command types
+	Commands []CommandType
 
 	// Raw is the original comment text
 	Raw string
