@@ -252,6 +252,44 @@ func (c *Client) MergePR(owner, repo string, prNumber int) error {
 	return err
 }
 
+// GetCommentReactions retrieves all reactions for a comment
+//
+// Returns a slice of Reaction structs containing user and reaction type information.
+func (c *Client) GetCommentReactions(owner, repo string, commentID int) ([]Reaction, error) {
+	path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d/reactions", owner, repo, commentID)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var rawReactions []map[string]interface{}
+	if err := json.Unmarshal(data, &rawReactions); err != nil {
+		return nil, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	reactions := make([]Reaction, 0, len(rawReactions))
+	for _, r := range rawReactions {
+		reaction := Reaction{}
+
+		if content, ok := r["content"].(string); ok {
+			reaction.Type = ReactionType(content)
+		}
+
+		if user, ok := r["user"].(map[string]interface{}); ok {
+			if login, ok := user["login"].(string); ok {
+				reaction.User = login
+			}
+		}
+
+		if reaction.Type != "" && reaction.User != "" {
+			reactions = append(reactions, reaction)
+		}
+	}
+
+	return reactions, nil
+}
+
 // GetPRInfo retrieves information about a pull request
 //
 // Returns a PRInfo struct with details about the PR including number, state,

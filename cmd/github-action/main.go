@@ -78,10 +78,12 @@ const (
 | Setting | Value |
 |---------|-------|
 | Quiet Success | ` + "`{{.QuietSuccess}}`" + ` |
+| Quiet Reactions | ` + "`{{.QuietReactions}}`" + ` |
 | Command Prefix | ` + "`{{.CommandPrefix}}`" + ` |
 | Disable Mentions | ` + "`{{.DisableMentions}}`" + ` |
 | Disable Bare Commands | ` + "`{{.DisableBareCommands}}`" + ` |
 | Disable Unapprove | ` + "`{{.DisableUnapprove}}`" + ` |
+| Disable Reactions | ` + "`{{.DisableReactions}}`" + ` |
 {{if .AllowedCommands}}| Allowed Commands | ` + "`{{.AllowedCommands}}`" + ` |
 {{else}}| Allowed Commands | All commands allowed |
 {{end}}
@@ -121,9 +123,12 @@ type stepSummaryData struct {
 	AppID               string
 	InstallationID      string
 	QuietSuccess        bool
+	QuietReactions      bool
 	CommandPrefix       string
 	DisableMentions     bool
 	DisableBareCommands bool
+	DisableUnapprove    bool
+	DisableReactions    bool
 	AllowedCommands     string
 	CommandAliases      map[string]string
 }
@@ -172,6 +177,8 @@ func init() {
 	rootCmd.Flags().Bool(config.KeyDisableMentions, false, "Disable mention-style commands")
 	rootCmd.Flags().Bool(config.KeyDisableBareCommands, false, "Disable bare commands")
 	rootCmd.Flags().Bool(config.KeyDisableUnapprove, false, "Disable unapprove commands")
+	rootCmd.Flags().Bool(config.KeyQuietReactions, false, "Disable reaction-based approval/merge comments")
+	rootCmd.Flags().Bool(config.KeyDisableReactions, false, "Disable reaction-based approvals/merges")
 
 	// Bind flags to Viper
 	bindViperFlags([]string{
@@ -182,6 +189,8 @@ func init() {
 		config.KeyDisableMentions,
 		config.KeyDisableBareCommands,
 		config.KeyDisableUnapprove,
+		config.KeyQuietReactions,
+		config.KeyDisableReactions,
 	})
 }
 
@@ -266,6 +275,13 @@ func run(_ *cobra.Command, _ []string) error {
 	for _, cmdType := range parsedCmd.Commands {
 		if cmdType == commands.CommandHelp {
 			return handleHelp(client, prNum, commentIDNum)
+		}
+	}
+
+	// Handle reaction-based approvals/merges if enabled
+	if !botConfig.DisableReactions {
+		if err := handleReactions(client, checker, prNum, commentIDNum); err != nil {
+			return err
 		}
 	}
 
@@ -549,6 +565,115 @@ func handleHelp(client *github.Client, prNum, commentID int) error {
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
+// handleReactions processes reaction-based approvals and merges.
+func handleReactions(
+	client *github.Client,
+	checker *permissions.Checker,
+	prNum, commentID int,
+) error {
+	// Fetch reactions for the comment
+	reactions, err := client.GetCommentReactions(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		commentID,
+	)
+	if err != nil {
+		// Don't fail if we can't fetch reactions, just skip
+		return nil
+	}
+
+	// Process each reaction
+	for _, reaction := range reactions {
+		// Check if user has permission
+		canApprove, err := checker.CanApprove(reaction.User, rootPath)
+		if err != nil || !canApprove {
+			continue
+		}
+
+		// Handle approve reaction
+		if reaction.Type == github.ReactionApprove {
+			if err := handleReactionApprove(client, prNum, commentID, reaction.User); err != nil {
+				return err
+			}
+		}
+
+		// Handle merge reaction
+		if reaction.Type == github.ReactionMerge {
+			if err := handleReactionMerge(client, prNum, commentID, reaction.User); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// handleReactionApprove handles approval via 👍 reaction.
+func handleReactionApprove(
+	client *github.Client,
+	prNum, commentID int,
+	approver string,
+) error {
+	// Approve the PR
+	if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewApprovalFailed,
+			ErrApprovePR,
+		)
+	}
+
+	// Post success feedback
+	fb := feedback.NewReactionApprovalSuccess(approver, botConfig.QuietReactions)
+
+	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+}
+
+// handleReactionMerge handles merge via 🚀 reaction.
+func handleReactionMerge(
+	client *github.Client,
+	prNum, commentID int,
+	author string,
+) error {
+	// Get PR info to check if it's mergeable
+	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	if err != nil {
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewMergeFailed,
+			ErrMergePR,
+		)
+	}
+
+	// Check if PR is mergeable
+	if !info.Mergeable {
+		return postNotMergeable(client, prNum, commentID)
+	}
+
+	// Merge the PR
+	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewMergeFailed,
+			ErrMergePR,
+		)
+	}
+
+	// Post success feedback
+	fb := feedback.NewReactionMergeSuccess(author, botConfig.QuietReactions)
+
+	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+}
+
 // postNotMergeable posts feedback when PR is not mergeable.
 func postNotMergeable(client *github.Client, prNum, commentID int) error {
 	fb := feedback.NewNotMergeable()
@@ -644,9 +769,12 @@ func writeStepSummary() error {
 		AppID:               runtimeConfig.GitHubAppID,
 		InstallationID:      runtimeConfig.InstallationID,
 		QuietSuccess:        botConfig.QuietSuccess,
+		QuietReactions:      botConfig.QuietReactions,
 		CommandPrefix:       botConfig.CommandPrefix,
 		DisableMentions:     botConfig.DisableMentions,
 		DisableBareCommands: botConfig.DisableBareCommands,
+		DisableUnapprove:    botConfig.DisableUnapprove,
+		DisableReactions:    botConfig.DisableReactions,
 		AllowedCommands:     allowedCommands,
 		CommandAliases:      botConfig.CommandAliases,
 	}

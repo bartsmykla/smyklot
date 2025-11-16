@@ -293,6 +293,48 @@ func NewUnapproveFailed(reason string) *Feedback {
 	}
 }
 
+// NewReactionApprovalSuccess creates success feedback for reaction-based approval
+//
+// The message acknowledges the approver and indicates the approval was triggered by reaction
+// If quietReactions is true, only an emoji reaction is used (no comment)
+func NewReactionApprovalSuccess(approver string, quietReactions bool) *Feedback {
+	message := ""
+	if !quietReactions {
+		message = fmt.Sprintf(
+			"✅ **PR Approved (via 👍 reaction)**\n\n"+
+				"This pull request has been approved by `%s` using a 👍 reaction.",
+			approver,
+		)
+	}
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "✅",
+		Message: message,
+	}
+}
+
+// NewReactionMergeSuccess creates success feedback for reaction-based merge
+//
+// The message acknowledges who merged the PR via reaction
+// If quietReactions is true, only an emoji reaction is used (no comment)
+func NewReactionMergeSuccess(author string, quietReactions bool) *Feedback {
+	message := ""
+	if !quietReactions {
+		message = fmt.Sprintf(
+			"✅ **PR Merged (via 🚀 reaction)**\n\n"+
+				"This pull request has been successfully merged by `%s` using a 🚀 reaction.",
+			author,
+		)
+	}
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "✅",
+		Message: message,
+	}
+}
+
 // NewHelp creates help feedback with usage instructions
 func NewHelp() *Feedback {
 	message := "ℹ️ **Smyklot Bot - Help**\n\n" +

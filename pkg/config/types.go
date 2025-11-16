@@ -10,6 +10,9 @@ type Config struct {
 	// QuietSuccess disables success comments (keeps reactions only)
 	QuietSuccess bool `json:"quiet_success"`
 
+	// QuietReactions disables reaction-based approval/merge comments
+	QuietReactions bool `json:"quiet_reactions"`
+
 	// AllowedCommands is a list of allowed command names
 	// an Empty list means all commands are allowed
 	AllowedCommands []string `json:"allowed_commands"`
@@ -30,18 +33,23 @@ type Config struct {
 
 	// DisableUnapprove disables unapprove/disapprove commands
 	DisableUnapprove bool `json:"disable_unapprove"`
+
+	// DisableReactions disables reaction-based approvals/merges
+	DisableReactions bool `json:"disable_reactions"`
 }
 
 // Default returns a Config with default values
 func Default() *Config {
 	return &Config{
 		QuietSuccess:        false,
+		QuietReactions:      false,
 		AllowedCommands:     []string{},
 		CommandAliases:      make(map[string]string),
 		CommandPrefix:       DefaultCommandPrefix,
 		DisableMentions:     false,
 		DisableBareCommands: false,
 		DisableUnapprove:    false,
+		DisableReactions:    false,
 	}
 }
 

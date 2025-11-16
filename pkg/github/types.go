@@ -39,4 +39,19 @@ const (
 
 	// ReactionEyes represents acknowledgment (👀)
 	ReactionEyes ReactionType = "eyes"
+
+	// ReactionApprove represents approve command (👍)
+	ReactionApprove ReactionType = "+1"
+
+	// ReactionMerge represents merge command (🚀)
+	ReactionMerge ReactionType = "rocket"
 )
+
+// Reaction represents a reaction on a comment
+type Reaction struct {
+	// Type is the reaction type
+	Type ReactionType
+
+	// User is the username of the user who reacted
+	User string
+}
