@@ -6,10 +6,12 @@ package github
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -332,6 +334,42 @@ func (c *Client) GetLabels(owner, repo string, prNumber int) ([]string, error) {
 	}
 
 	return labels, nil
+}
+
+// GetCodeowners fetches the CODEOWNERS file content from the repository
+//
+// Returns the decoded content of .github/CODEOWNERS file.
+func (c *Client) GetCodeowners(owner, repo string) (string, error) {
+	path := fmt.Sprintf("/repos/%s/%s/contents/.github/CODEOWNERS", owner, repo)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return "", NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	content, ok := response["content"].(string)
+	if !ok {
+		return "", NewAPIError(
+			ErrResponseParse,
+			0,
+			"GET",
+			path,
+			fmt.Errorf("no content field in response"),
+		)
+	}
+
+	// GitHub API returns base64-encoded content, decode it
+	decoded, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(content, "\n", ""))
+	if err != nil {
+		return "", NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	return string(decoded), nil
 }
 
 // GetPRInfo retrieves information about a pull request

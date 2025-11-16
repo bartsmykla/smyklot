@@ -40,6 +40,9 @@ var (
 	// ErrGetWorkingDirectory is returned when getting working directory fails
 	ErrGetWorkingDirectory = errors.New("failed to get the working directory")
 
+	// ErrGetCodeowners is returned when fetching CODEOWNERS from GitHub fails
+	ErrGetCodeowners = errors.New("failed to fetch CODEOWNERS from GitHub")
+
 	// ErrInitPermissions is returned when initializing permissions fails
 	ErrInitPermissions = errors.New("failed to initialize permissions")
 

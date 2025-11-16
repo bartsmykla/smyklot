@@ -278,14 +278,17 @@ func run(_ *cobra.Command, _ []string) error {
 		github.ReactionError,
 	)
 
-	// Get the current working directory (repository root)
-	repoPath, err := os.Getwd()
+	// Fetch CODEOWNERS content from GitHub API
+	codeownersContent, err := client.GetCodeowners(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+	)
 	if err != nil {
-		return NewGitHubError(ErrGetWorkingDirectory, err)
+		return NewGitHubError(ErrGetCodeowners, err)
 	}
 
-	// Initialize permission checker
-	checker, err := permissions.NewChecker(repoPath)
+	// Initialize permission checker from content
+	checker, err := permissions.NewCheckerFromContent(codeownersContent)
 	if err != nil {
 		return NewGitHubError(ErrInitPermissions, err)
 	}

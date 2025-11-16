@@ -1,0 +1,115 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: smyklot
+    main: ./cmd/github-action
+    binary: smyklot
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: smyklot
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    files:
+      - LICENSE
+      - README.md
+
+dockers:
+  - image_templates:
+      - "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}-amd64"
+      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}-amd64"
+      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}-amd64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/bartsmykla/smyklot"
+    extra_files:
+      - go.mod
+      - go.sum
+      - cmd
+      - pkg
+    goarch: amd64
+
+  - image_templates:
+      - "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}-arm64"
+      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}-arm64"
+      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}-arm64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/bartsmykla/smyklot"
+    extra_files:
+      - go.mod
+      - go.sum
+      - cmd
+      - pkg
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}"
+    image_templates:
+      - "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}-amd64"
+      - "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}-arm64"
+  
+  - name_template: "ghcr.io/bartsmykla/smyklot:{{ .Major }}"
+    image_templates:
+      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}-amd64"
+      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}-arm64"
+  
+  - name_template: "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}"
+    image_templates:
+      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}-arm64"
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+      - '^build:'
+
+release:
+  github:
+    owner: bartsmykla
+    name: smyklot
+  draft: false
+  prerelease: auto

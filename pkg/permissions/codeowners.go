@@ -10,6 +10,82 @@ import (
 	"strings"
 )
 
+// parseEntries parses CODEOWNERS entries from a scanner
+func parseEntries(scanner *bufio.Scanner) []CodeownersEntry {
+	entries := make([]CodeownersEntry, 0)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse the line: <pattern> <owners...>
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			// Invalid format: need at least pattern and one owner
+			continue
+		}
+
+		pattern := parts[0]
+		owners := make([]string, 0)
+
+		// Extract owners (strings starting with @)
+		for _, part := range parts[1:] {
+			if strings.HasPrefix(part, "@") {
+				// Remove the @ prefix for consistency
+				owner := strings.TrimPrefix(part, "@")
+				owners = append(owners, owner)
+			}
+		}
+
+		if len(owners) > 0 {
+			entries = append(entries, CodeownersEntry{
+				Pattern: pattern,
+				Owners:  owners,
+			})
+		}
+	}
+
+	return entries
+}
+
+// ParseCodeownersContent parses CODEOWNERS content from a string
+//
+// CODEOWNERS format:
+//   - Lines starting with # are comments
+//   - Empty lines are ignored
+//   - Format: <pattern> <owner1> <owner2> ...
+//   - Owners start with @ (e.g., @username, @org/team)
+//
+// Example:
+//   # Global owners
+//   * @global-owner1 @global-owner2
+//   /docs/ @doc-team
+//   *.js @js-team
+//
+// For Phase 1, this parser focuses on global owners (pattern: *)
+// Path-specific ownership will be implemented in later phases
+func ParseCodeownersContent(content string) (*CodeownersFile, error) {
+	if content == "" {
+		return nil, ErrEmptyContent
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	entries := parseEntries(scanner)
+
+	if err := scanner.Err(); err != nil {
+		return nil, NewParseError(ErrReadFailed, "", err)
+	}
+
+	return &CodeownersFile{
+		Path:    "",
+		Entries: entries,
+	}, nil
+}
+
 // ParseCodeownersFile reads and parses a CODEOWNERS file from the given path
 //
 // CODEOWNERS format:
@@ -40,53 +116,17 @@ func ParseCodeownersFile(filePath string) (*CodeownersFile, error) {
 		_ = file.Close()
 	}()
 
-	codeowners := &CodeownersFile{
-		Path:    filePath,
-		Entries: make([]CodeownersEntry, 0),
-	}
-
 	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Parse the line: <pattern> <owners...>
-		parts := strings.Fields(line)
-		if len(parts) < 2 {
-			// Invalid format: need at least pattern and one owner
-			continue
-		}
-
-		pattern := parts[0]
-		owners := make([]string, 0)
-
-		// Extract owners (strings starting with @)
-		for _, part := range parts[1:] {
-			if strings.HasPrefix(part, "@") {
-				// Remove the @ prefix for consistency
-				owner := strings.TrimPrefix(part, "@")
-				owners = append(owners, owner)
-			}
-		}
-
-		if len(owners) > 0 {
-			codeowners.Entries = append(codeowners.Entries, CodeownersEntry{
-				Pattern: pattern,
-				Owners:  owners,
-			})
-		}
-	}
+	entries := parseEntries(scanner)
 
 	if err := scanner.Err(); err != nil {
 		return nil, NewParseError(ErrReadFailed, filePath, err)
 	}
 
-	return codeowners, nil
+	return &CodeownersFile{
+		Path:    filePath,
+		Entries: entries,
+	}, nil
 }
 
 // GetGlobalOwners returns the list of global owners (pattern: *)

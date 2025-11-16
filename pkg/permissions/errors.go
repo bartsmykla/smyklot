@@ -11,6 +11,9 @@ var (
 	// ErrEmptyFilePath is returned when an empty file path is provided
 	ErrEmptyFilePath = errors.New("empty file path provided")
 
+	// ErrEmptyContent is returned when empty content is provided
+	ErrEmptyContent = errors.New("empty content provided")
+
 	// ErrReadFailed is returned when reading the CODEOWNERS file fails
 	ErrReadFailed = errors.New("failed to read the CODEOWNERS file")
 

@@ -23,6 +23,32 @@ type Checker struct {
 	rootApprovers []string
 }
 
+// NewCheckerFromContent creates a new permission checker from CODEOWNERS content
+//
+// This is useful when the CODEOWNERS content is fetched from an API
+// rather than read from the filesystem.
+//
+// Returns an error if the content cannot be parsed.
+func NewCheckerFromContent(content string) (*Checker, error) {
+	checker := &Checker{
+		rootApprovers: []string{},
+	}
+
+	if content == "" {
+		return checker, nil
+	}
+
+	codeowners, err := ParseCodeownersContent(content)
+	if err != nil {
+		// If the content cannot be parsed, treat it as having no approvers
+		return checker, nil
+	}
+
+	checker.rootApprovers = codeowners.GetGlobalOwners()
+
+	return checker, nil
+}
+
 // NewChecker creates a new permission checker for the given repository path
 //
 // The checker loads the .github/CODEOWNERS file if it exists. If no
