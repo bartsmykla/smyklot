@@ -254,6 +254,45 @@ func NewNotMergeable() *Feedback {
 	}
 }
 
+// NewUnapproveSuccess creates success feedback for dismissing a review
+//
+// The message acknowledges who dismissed the review
+// If quietSuccess is true, only an emoji reaction is used (no comment)
+func NewUnapproveSuccess(author string, quietSuccess bool) *Feedback {
+	message := ""
+	if !quietSuccess {
+		message = fmt.Sprintf(
+			"✅ **Review Dismissed**\n\n"+
+				"The approval has been dismissed by `%s`.",
+			author,
+		)
+	}
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "✅",
+		Message: message,
+	}
+}
+
+// NewUnapproveFailed creates error feedback for a failed review dismissal
+//
+// The reason parameter should describe why the dismissal failed
+func NewUnapproveFailed(reason string) *Feedback {
+	message := fmt.Sprintf(
+		"❌ **Dismiss Failed**\n\n"+
+			"Failed to dismiss the approval.\n\n"+
+			"**Reason:** %s",
+		reason,
+	)
+
+	return &Feedback{
+		Type:    Error,
+		Emoji:   "❌",
+		Message: message,
+	}
+}
+
 // String returns a string representation of the feedback
 //
 // For success: Returns emoji only

@@ -27,6 +27,9 @@ const (
 	// KeyDisableBareCommands is the config key for disable_bare_commands setting
 	KeyDisableBareCommands = "disable_bare_commands"
 
+	// KeyDisableUnapprove is the config key for disable_unapprove setting
+	KeyDisableUnapprove = "disable_unapprove"
+
 	// EnvPrefix is the prefix for environment variables
 	EnvPrefix = "SMYKLOT"
 )
@@ -40,6 +43,7 @@ func SetupViper(v *viper.Viper) {
 	v.SetDefault(KeyCommandPrefix, DefaultCommandPrefix)
 	v.SetDefault(KeyDisableMentions, false)
 	v.SetDefault(KeyDisableBareCommands, false)
+	v.SetDefault(KeyDisableUnapprove, false)
 
 	// Enable environment variable support
 	v.SetEnvPrefix(EnvPrefix)
@@ -55,5 +59,6 @@ func LoadFromViper(v *viper.Viper) *Config {
 		CommandPrefix:       v.GetString(KeyCommandPrefix),
 		DisableMentions:     v.GetBool(KeyDisableMentions),
 		DisableBareCommands: v.GetBool(KeyDisableBareCommands),
+		DisableUnapprove:    v.GetBool(KeyDisableUnapprove),
 	}
 }

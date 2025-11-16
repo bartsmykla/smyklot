@@ -10,6 +10,9 @@ const (
 	// CommandMerge represents the merge command
 	CommandMerge CommandType = "merge"
 
+	// CommandUnapprove represents the unapprove command
+	CommandUnapprove CommandType = "unapprove"
+
 	// CommandUnknown represents an unknown or invalid command
 	CommandUnknown CommandType = "unknown"
 )

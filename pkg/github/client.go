@@ -130,6 +130,118 @@ func (c *Client) ApprovePR(owner, repo string, prNumber int) error {
 	return err
 }
 
+// DismissReview dismisses all approved reviews by the authenticated user
+//
+// This finds all APPROVED reviews by the authenticated user and dismisses them.
+func (c *Client) DismissReview(owner, repo string, prNumber int) error {
+	username, err := c.getAuthenticatedUser()
+	if err != nil {
+		return err
+	}
+
+	reviews, err := c.getPullRequestReviews(owner, repo, prNumber)
+	if err != nil {
+		return err
+	}
+
+	return c.dismissApprovedReviews(owner, repo, prNumber, username, reviews)
+}
+
+// getAuthenticatedUser retrieves the authenticated user's username
+func (c *Client) getAuthenticatedUser() (string, error) {
+	userPath := "/user"
+	userData, err := c.makeRequest("GET", userPath, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var user map[string]interface{}
+	if err := json.Unmarshal(userData, &user); err != nil {
+		return "", NewAPIError(ErrResponseParse, 0, "GET", userPath, err)
+	}
+
+	username, ok := user["login"].(string)
+	if !ok {
+		return "", NewAPIError(ErrResponseParse, 0, "GET", userPath, fmt.Errorf("unable to get username"))
+	}
+
+	return username, nil
+}
+
+// getPullRequestReviews retrieves all reviews for a pull request
+func (c *Client) getPullRequestReviews(owner, repo string, prNumber int) ([]map[string]interface{}, error) {
+	reviewsPath := fmt.Sprintf("/repos/%s/%s/pulls/%d/reviews", owner, repo, prNumber)
+	reviewsData, err := c.makeRequest("GET", reviewsPath, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var reviews []map[string]interface{}
+	if err := json.Unmarshal(reviewsData, &reviews); err != nil {
+		return nil, NewAPIError(ErrResponseParse, 0, "GET", reviewsPath, err)
+	}
+
+	return reviews, nil
+}
+
+// dismissApprovedReviews dismisses all approved reviews by the specified user
+func (c *Client) dismissApprovedReviews(
+	owner, repo string,
+	prNumber int,
+	username string,
+	reviews []map[string]interface{},
+) error {
+	for _, review := range reviews {
+		if err := c.dismissReviewIfApprovedByUser(owner, repo, prNumber, username, review); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// dismissReviewIfApprovedByUser dismisses a review if it's approved by the specified user
+func (c *Client) dismissReviewIfApprovedByUser(
+	owner, repo string,
+	prNumber int,
+	username string,
+	review map[string]interface{},
+) error {
+	state, ok := review["state"].(string)
+	if !ok || state != "APPROVED" {
+		return nil
+	}
+
+	reviewUser, ok := review["user"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	reviewUsername, ok := reviewUser["login"].(string)
+	if !ok || reviewUsername != username {
+		return nil
+	}
+
+	reviewID, ok := review["id"].(float64)
+	if !ok {
+		return nil
+	}
+
+	dismissPath := fmt.Sprintf(
+		"/repos/%s/%s/pulls/%d/reviews/%d/dismissals",
+		owner,
+		repo,
+		prNumber,
+		int(reviewID),
+	)
+	payload := map[string]string{
+		"message": "Review dismissed",
+	}
+
+	_, err := c.makeRequest("PUT", dismissPath, payload)
+	return err
+}
+
 // MergePR merges a pull request
 //
 // This attempts to merge the PR using the default merge method.

@@ -1,10 +1,12 @@
 // Package commands provides command parsing for Smyklot PR comments
 //
-// It supports parsing slash commands (/approve, /merge) and mention commands
-// (@smyklot approve, @smyklot merge) from GitHub PR comment text
+// It supports parsing slash commands (/approve, /merge, /unapprove) and
+// mention commands (@smyklot approve, @smyklot merge, @smyklot unapprove)
+// from GitHub PR comment text
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -18,11 +20,16 @@ var (
 
 	// validCommands maps command names to their corresponding types
 	validCommands = map[string]CommandType{
-		"approve": CommandApprove,
-		"accept":  CommandApprove,
-		"lgtm":    CommandApprove,
-		"merge":   CommandMerge,
+		"approve":    CommandApprove,
+		"accept":     CommandApprove,
+		"lgtm":       CommandApprove,
+		"merge":      CommandMerge,
+		"unapprove":  CommandUnapprove,
+		"disapprove": CommandUnapprove,
 	}
+
+	// ErrContradictingCommands indicates contradicting commands were found
+	ErrContradictingCommands = errors.New("contradicting commands found: cannot use approve/merge with unapprove")
 )
 
 // ParseCommand parses comment text and extracts a command if present
@@ -79,6 +86,12 @@ func ParseCommand(commentBody string, cfg *config.Config) (Command, error) {
 
 	// Convert map to slice (deduplicated and ordered)
 	commands := buildCommandList(commandsFound)
+
+	// Check for contradicting commands
+	if hasContradictingCommands(commands) {
+		cmd.Error = ErrContradictingCommands.Error()
+		return cmd, ErrContradictingCommands
+	}
 
 	// Populate the command struct
 	if len(commands) > 0 {
@@ -186,15 +199,36 @@ func extractCommandsFromLine(line string, cfg *config.Config, commandsFound map[
 // buildCommandList converts the commands map to an ordered slice
 func buildCommandList(commandsFound map[CommandType]bool) []CommandType {
 	var commands []CommandType
-	// Maintain consistent order: approve then merge
+	// Maintain consistent order: approve, merge, unapprove
 	if commandsFound[CommandApprove] {
 		commands = append(commands, CommandApprove)
 	}
 	if commandsFound[CommandMerge] {
 		commands = append(commands, CommandMerge)
 	}
+	if commandsFound[CommandUnapprove] {
+		commands = append(commands, CommandUnapprove)
+	}
 
 	return commands
+}
+
+// hasContradictingCommands checks if the command list contains contradicting commands
+// Returns true if both unapprove and (approve or merge) are present
+func hasContradictingCommands(commands []CommandType) bool {
+	hasUnapprove := false
+	hasApproveOrMerge := false
+
+	for _, cmd := range commands {
+		if cmd == CommandUnapprove {
+			hasUnapprove = true
+		}
+		if cmd == CommandApprove || cmd == CommandMerge {
+			hasApproveOrMerge = true
+		}
+	}
+
+	return hasUnapprove && hasApproveOrMerge
 }
 
 // resolveCommand resolves aliases, validates the command, and returns the CommandType
@@ -205,6 +239,11 @@ func resolveCommand(commandName string, cfg *config.Config) CommandType {
 
 	cmdType, ok := validCommands[commandName]
 	if !ok {
+		return CommandUnknown
+	}
+
+	// Check if unapprove is disabled
+	if cmdType == CommandUnapprove && cfg.DisableUnapprove {
 		return CommandUnknown
 	}
 

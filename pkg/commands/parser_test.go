@@ -534,5 +534,94 @@ Thanks!`
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 		})
+
+		Context("when parsing unapprove commands", func() {
+			It("should parse /unapprove command", func() {
+				cmd, err := commands.ParseCommand("/unapprove", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandUnapprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse @smyklot unapprove command", func() {
+				cmd, err := commands.ParseCommand("@smyklot unapprove", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandUnapprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse bare unapprove command", func() {
+				cmd, err := commands.ParseCommand("unapprove", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandUnapprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse disapprove as alias for unapprove", func() {
+				cmd, err := commands.ParseCommand("/disapprove", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandUnapprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should NOT parse unapprove when disabled via config", func() {
+				cfg := &config.Config{
+					DisableUnapprove: true,
+				}
+				cmd, err := commands.ParseCommand("/unapprove", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(BeEmpty())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+		})
+
+		Context("when detecting contradicting commands", func() {
+			It("should return error for approve and unapprove", func() {
+				cmd, err := commands.ParseCommand("/approve /unapprove", nil)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("contradicting commands"))
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should return error for merge and unapprove", func() {
+				cmd, err := commands.ParseCommand("/merge /unapprove", nil)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("contradicting commands"))
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should return error for approve, merge, and unapprove", func() {
+				cmd, err := commands.ParseCommand("approve merge unapprove", nil)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("contradicting commands"))
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should return error for lgtm and disapprove", func() {
+				cmd, err := commands.ParseCommand("lgtm disapprove", nil)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("contradicting commands"))
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should allow approve and merge together", func() {
+				cmd, err := commands.ParseCommand("/approve /merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should allow only unapprove", func() {
+				cmd, err := commands.ParseCommand("/unapprove", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandUnapprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+		})
 	})
 })

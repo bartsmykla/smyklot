@@ -27,6 +27,9 @@ type Config struct {
 
 	// DisableBareCommands disables bare commands (approve, lgtm, merge)
 	DisableBareCommands bool `json:"disable_bare_commands"`
+
+	// DisableUnapprove disables unapprove/disapprove commands
+	DisableUnapprove bool `json:"disable_unapprove"`
 }
 
 // Default returns a Config with default values
@@ -38,6 +41,7 @@ func Default() *Config {
 		CommandPrefix:       DefaultCommandPrefix,
 		DisableMentions:     false,
 		DisableBareCommands: false,
+		DisableUnapprove:    false,
 	}
 }
 

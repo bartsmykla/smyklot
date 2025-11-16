@@ -2,8 +2,8 @@
 //
 // Smyklot automates PR approvals and merges based on CODEOWNERS permissions.
 // It reads environment variables from GitHub Actions and executes commands
-// (/approve, @smyklot approve, approve, lgtm, merge) based on user permissions
-// defined in the .github/CODEOWNERS file.
+// (/approve, @smyklot approve, approve, lgtm, merge, unapprove) based on user
+// permissions defined in the .github/CODEOWNERS file.
 package main
 
 import (
@@ -81,6 +81,7 @@ const (
 | Command Prefix | ` + "`{{.CommandPrefix}}`" + ` |
 | Disable Mentions | ` + "`{{.DisableMentions}}`" + ` |
 | Disable Bare Commands | ` + "`{{.DisableBareCommands}}`" + ` |
+| Disable Unapprove | ` + "`{{.DisableUnapprove}}`" + ` |
 {{if .AllowedCommands}}| Allowed Commands | ` + "`{{.AllowedCommands}}`" + ` |
 {{else}}| Allowed Commands | All commands allowed |
 {{end}}
@@ -170,6 +171,7 @@ func init() {
 	rootCmd.Flags().String(config.KeyCommandPrefix, config.DefaultCommandPrefix, "Command prefix")
 	rootCmd.Flags().Bool(config.KeyDisableMentions, false, "Disable mention-style commands")
 	rootCmd.Flags().Bool(config.KeyDisableBareCommands, false, "Disable bare commands")
+	rootCmd.Flags().Bool(config.KeyDisableUnapprove, false, "Disable unapprove commands")
 
 	// Bind flags to Viper
 	bindViperFlags([]string{
@@ -179,6 +181,7 @@ func init() {
 		config.KeyCommandPrefix,
 		config.KeyDisableMentions,
 		config.KeyDisableBareCommands,
+		config.KeyDisableUnapprove,
 	})
 }
 
@@ -279,6 +282,10 @@ func run(_ *cobra.Command, _ []string) error {
 			}
 		case commands.CommandMerge:
 			if err := handleMerge(client, prNum, commentIDNum); err != nil {
+				return err
+			}
+		case commands.CommandUnapprove:
+			if err := handleUnapprove(client, prNum, commentIDNum); err != nil {
 				return err
 			}
 		default:
@@ -497,6 +504,31 @@ func handleMerge(client *github.Client, prNum, commentID int) error {
 
 	// Post-success feedback
 	fb := feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
+
+	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+}
+
+// handleUnapprove handles the /unapprove command.
+func handleUnapprove(client *github.Client, prNum, commentID int) error {
+	// Add eyes reaction to acknowledge
+	if err := addReaction(client, commentID, github.ReactionEyes); err != nil {
+		return err
+	}
+
+	// Dismiss the review
+	if err := client.DismissReview(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewUnapproveFailed,
+			ErrDismissReview,
+		)
+	}
+
+	// Post-success feedback
+	fb := feedback.NewUnapproveSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
