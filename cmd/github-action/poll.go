@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/bartsmykla/smyklot/pkg/config"
 	"github.com/bartsmykla/smyklot/pkg/github"
 	"github.com/bartsmykla/smyklot/pkg/permissions"
 )
@@ -40,6 +41,11 @@ func init() {
 }
 
 func runPoll(cmd *cobra.Command, _ []string) error {
+	// Load bot configuration
+	if err := loadPollBotConfig(); err != nil {
+		return err
+	}
+
 	// Get configuration from flags and environment
 	repo, token, err := getPollConfig(cmd)
 	if err != nil {
@@ -60,6 +66,19 @@ func runPoll(cmd *cobra.Command, _ []string) error {
 
 	// Poll and process all open PRs
 	return pollAllPRs(client, checker, repoOwner, repoName)
+}
+
+// loadPollBotConfig loads bot configuration from JSON config and Viper
+func loadPollBotConfig() error {
+	// Load JSON configuration from SMYKLOT_CONFIG if present
+	if err := config.LoadJSONConfig(v); err != nil {
+		return NewConfigError(ErrConfigLoad, err)
+	}
+
+	// Load bot configuration from Viper
+	botConfig = config.LoadFromViper(v)
+
+	return nil
 }
 
 // getPollConfig retrieves repo and token from flags or environment
