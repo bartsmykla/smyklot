@@ -125,10 +125,15 @@ func setupPollClients(
 		return nil, nil, NewGitHubError(ErrGitHubClient, err)
 	}
 
-	// Fetch CODEOWNERS
+	// Fetch CODEOWNERS (returns empty string if not found)
 	codeownersContent, err := client.GetCodeowners(repoOwner, repoName)
 	if err != nil {
 		return nil, nil, NewGitHubError(ErrGetCodeowners, err)
+	}
+
+	// Log if CODEOWNERS is missing
+	if codeownersContent == "" {
+		fmt.Println("CODEOWNERS file not found, defaulting to repository admin permissions")
 	}
 
 	// Initialize permission checker

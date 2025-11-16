@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -398,11 +399,17 @@ func (c *Client) GetLabels(owner, repo string, prNumber int) ([]string, error) {
 // GetCodeowners fetches the CODEOWNERS file content from the repository
 //
 // Returns the decoded content of .github/CODEOWNERS file.
+// Returns empty string (not error) if file doesn't exist (404).
 func (c *Client) GetCodeowners(owner, repo string) (string, error) {
 	path := fmt.Sprintf("/repos/%s/%s/contents/.github/CODEOWNERS", owner, repo)
 
 	data, err := c.makeRequest("GET", path, nil)
 	if err != nil {
+		// Return empty string if CODEOWNERS doesn't exist (404)
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+			return "", nil
+		}
 		return "", err
 	}
 
@@ -535,6 +542,40 @@ func (c *Client) GetOpenPRs(owner, repo string) ([]map[string]interface{}, error
 	}
 
 	return openPRs, nil
+}
+
+// HasWritePermission checks if the user has write/admin permission to the repository
+func (c *Client) HasWritePermission(owner, repo, username string) (bool, error) {
+	path := fmt.Sprintf("/repos/%s/%s/collaborators/%s/permission", owner, repo, username)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		// If user is not a collaborator, return false (not an error)
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+			return false, nil
+		}
+		return false, err
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return false, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	permission, ok := response["permission"].(string)
+	if !ok {
+		return false, NewAPIError(
+			ErrResponseParse,
+			0,
+			"GET",
+			path,
+			fmt.Errorf("no permission field in response"),
+		)
+	}
+
+	// admin and write permissions allow approving/merging
+	return permission == "admin" || permission == "write", nil
 }
 
 // IsMergeQueueEnabled checks if merge queue is enabled for a branch

@@ -308,7 +308,14 @@ func run(_ *cobra.Command, _ []string) error {
 	}
 
 	// Check if the user has permission to execute this command
-	canApprove, err := checker.CanApprove(runtimeConfig.CommentAuthor, rootPath)
+	canApprove, err := checkUserPermission(
+		client,
+		checker,
+		runtimeConfig.CommentAuthor,
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		rootPath,
+	)
 	if err != nil {
 		return NewGitHubError(ErrPermissionCheck, err)
 	}
@@ -522,6 +529,39 @@ func postOperationFailure(
 	}
 
 	return NewGitHubError(sentinelErr, operationErr)
+}
+
+// checkUserPermission checks if a user has permission to approve/merge
+//
+// It first checks CODEOWNERS permissions. If no CODEOWNERS exists (empty),
+// it falls back to checking if the user has admin/write repository permissions.
+func checkUserPermission(
+	client *github.Client,
+	checker *permissions.Checker,
+	username, owner, repo, rootPath string,
+) (bool, error) {
+	// First check CODEOWNERS permissions
+	canApprove, err := checker.CanApprove(username, rootPath)
+	if err != nil {
+		return false, err
+	}
+
+	// If user is in CODEOWNERS, grant permission
+	if canApprove {
+		return true, nil
+	}
+
+	// If CODEOWNERS has no approvers (empty file), check admin permissions
+	if len(checker.GetApprovers()) == 0 {
+		hasWrite, err := client.HasWritePermission(owner, repo, username)
+		if err != nil {
+			return false, err
+		}
+		return hasWrite, nil
+	}
+
+	// CODEOWNERS exists but user is not in it
+	return false, nil
 }
 
 // handleUnauthorized posts feedback for unauthorized users.
@@ -893,7 +933,14 @@ func handleReactions(
 
 	for _, reaction := range reactions {
 		// Check if user has permission
-		canApprove, err := checker.CanApprove(reaction.User, rootPath)
+		canApprove, err := checkUserPermission(
+			client,
+			checker,
+			reaction.User,
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			rootPath,
+		)
 		if err != nil || !canApprove {
 			continue
 		}
@@ -918,7 +965,14 @@ func handleReactions(
 	// Process each reaction
 	for _, reaction := range reactions {
 		// Check if user has permission
-		canApprove, err := checker.CanApprove(reaction.User, rootPath)
+		canApprove, err := checkUserPermission(
+			client,
+			checker,
+			reaction.User,
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			rootPath,
+		)
 		if err != nil || !canApprove {
 			continue
 		}
