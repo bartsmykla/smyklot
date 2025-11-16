@@ -188,6 +188,82 @@ var _ = Describe("Config [Unit]", func() {
 		})
 	})
 
+	Describe("LoadJSONConfig", func() {
+		var v *viper.Viper
+
+		BeforeEach(func() {
+			v = viper.New()
+			config.SetupViper(v)
+		})
+
+		AfterEach(func() {
+			_ = os.Unsetenv(config.EnvConfig)
+		})
+
+		It("should return nil when SMYKLOT_CONFIG is not set", func() {
+			err := config.LoadJSONConfig(v)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should load JSON configuration from SMYKLOT_CONFIG", func() {
+			jsonConfig := `{
+				"quiet_success": true,
+				"allowed_commands": ["approve", "merge"],
+				"command_aliases": {"app": "approve"},
+				"command_prefix": "!",
+				"disable_mentions": true
+			}`
+
+			Expect(os.Setenv(config.EnvConfig, jsonConfig)).To(Succeed())
+
+			err := config.LoadJSONConfig(v)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg := config.LoadFromViper(v)
+			Expect(cfg.QuietSuccess).To(BeTrue())
+			Expect(cfg.AllowedCommands).To(ConsistOf("approve", "merge"))
+			Expect(cfg.CommandAliases).To(HaveKeyWithValue("app", "approve"))
+			Expect(cfg.CommandPrefix).To(Equal("!"))
+			Expect(cfg.DisableMentions).To(BeTrue())
+		})
+
+		It("should return error for invalid JSON", func() {
+			Expect(os.Setenv(config.EnvConfig, "invalid json")).To(Succeed())
+
+			err := config.LoadJSONConfig(v)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should handle empty JSON object", func() {
+			Expect(os.Setenv(config.EnvConfig, "{}")).To(Succeed())
+
+			err := config.LoadJSONConfig(v)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg := config.LoadFromViper(v)
+			// Should use defaults
+			Expect(cfg.QuietSuccess).To(BeFalse())
+			Expect(cfg.CommandPrefix).To(Equal("/"))
+		})
+
+		It("should merge with existing Viper values", func() {
+			// Set a value directly in Viper
+			v.Set(config.KeyDisableBareCommands, true)
+
+			// Set JSON config with different values
+			jsonConfig := `{"quiet_success": true}`
+			Expect(os.Setenv(config.EnvConfig, jsonConfig)).To(Succeed())
+
+			err := config.LoadJSONConfig(v)
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg := config.LoadFromViper(v)
+			// Both values should be present
+			Expect(cfg.QuietSuccess).To(BeTrue())
+			Expect(cfg.DisableBareCommands).To(BeTrue())
+		})
+	})
+
 	Describe("IsCommandAllowed", func() {
 		It("should allow all commands when AllowedCommands is empty", func() {
 			cfg := config.Default()
