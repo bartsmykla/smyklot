@@ -83,7 +83,7 @@ All commands are case-insensitive.
 | 🚀 | Merge the pull request |
 | ❤️ | Cleanup (remove all bot reactions, approvals, and comments) |
 
-**Note**: Removing a reaction will automatically undo the corresponding action (remove approval/merge labels).
+**Note**: Reactions must be added to the PR description, not to comments. Removing a reaction will automatically undo the corresponding action (remove approval/merge labels).
 
 ### Multiple Commands
 
@@ -120,7 +120,7 @@ Any of these will approve the PR:
 lgtm
 ```
 
-Or simply add a 👍 reaction to any comment.
+Or add a 👍 reaction to the PR description.
 
 #### Merging a PR
 
@@ -130,7 +130,7 @@ Merge with default method (with fallback to squash/rebase if merge commits disal
 /merge
 ```
 
-Or add a 🚀 reaction to any comment.
+Or add a 🚀 reaction to the PR description.
 
 #### Squash Merging
 
@@ -150,7 +150,7 @@ Or add a 🚀 reaction to any comment.
 /unapprove
 ```
 
-Or remove your 👍 reaction.
+Or remove your 👍 reaction from the PR description.
 
 #### Cleanup
 
@@ -160,7 +160,7 @@ Remove all bot reactions, approvals, and comments:
 /cleanup
 ```
 
-Or add a ❤️ reaction to any comment.
+Or add a ❤️ reaction to the PR description.
 
 **Note**: Cleanup cannot be combined with other commands.
 
@@ -223,6 +223,7 @@ Configure individual settings via repository variables or environment variables 
 | `SMYKLOT_DISABLE_REACTIONS` | boolean | `false` | Disable reaction-based approvals/merges |
 | `SMYKLOT_DISABLE_DELETED_COMMENTS` | boolean | `false` | Disable handling of deleted comments |
 | `SMYKLOT_ALLOW_SELF_APPROVAL` | boolean | `false` | Allow PR authors to approve their own PRs |
+| `SMYKLOT_BOT_USERNAME` | string | `smyklot[bot]` | Bot username for cleanup operations (GitHub App format: `{app-slug}[bot]`) |
 
 #### Configuration Examples
 

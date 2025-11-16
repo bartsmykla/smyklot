@@ -6,7 +6,7 @@
 
 **Problem**: Reaction-based commands (👍, 🚀, ❤️) didn't work in GitHub Actions because `issue_comment` events don't fire for reaction changes.
 
-**Solution**: Created a `poll` subcommand that checks all open PRs and their comments for reactions every 5 minutes.
+**Solution**: Created a `poll` subcommand that checks all open PRs for reactions on the PR description every 5 minutes.
 
 **Implementation**:
 
@@ -94,6 +94,34 @@
 
 - smyklot repository (bartsmykla/smyklot)
 - .dotfiles repository (smykla-labs/.dotfiles) - PR #38
+
+### 4. PR Reaction Scope Fix (v1.7.6)
+
+**Problem**: Poll workflow was checking reactions on all PR comments instead of the PR description itself. This caused confusion as users expected to react to the PR, not individual comments.
+
+**Solution**: Changed poll workflow to process reactions on PR descriptions only.
+
+**Implementation**:
+
+- Added `GetPRReactions()` method to get reactions on PR description
+- Refactored `processPR()` to process PR reactions directly instead of iterating through comments
+- Updated `handleReactions()` to distinguish between PR and comment reactions
+- Removed `processComment()` and `pollCommentReactions()` functions (no longer needed)
+- Fixed cleanup command `/user` permission issue by adding `SMYKLOT_BOT_USERNAME` configuration
+- Added `DismissReviewByUsername()` method to avoid restricted `/user` endpoint
+
+**Files changed**:
+
+- `cmd/github-action/main.go` - Added `BotUsername` configuration, updated cleanup logic
+- `cmd/github-action/poll.go` - Rewrote to process PR reactions instead of comment reactions
+- `pkg/github/client.go` - Added `GetPRReactions()` and `DismissReviewByUsername()` methods
+
+**Benefits**:
+
+- Clearer UX: Users react to the PR description, not comments
+- Consistent with GitHub's reaction model
+- Cleanup command now works with GitHub App tokens
+- 60+ lines of unused code removed
 
 ## What Needs to Be Done Next
 
@@ -223,6 +251,7 @@
 
 - **v1.3.0** (2025-11-16): Polling workflow implementation
 - **v1.4.0** (2025-11-16): Auto-merge support with queue detection
+- **v1.7.6** (2025-11-16): PR reaction scope fix and cleanup command fix
 
 ## References
 
