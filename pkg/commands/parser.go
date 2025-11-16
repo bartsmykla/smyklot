@@ -121,12 +121,63 @@ func findMentionCommands(commentBody string, cfg *config.Config, commandsFound m
 }
 
 // findBareCommands finds all bare commands in the comment body
+// Only matches commands on lines that are "command-heavy" to avoid accidental matches
 func findBareCommands(commentBody string, cfg *config.Config, commandsFound map[CommandType]bool) {
-	// Split by whitespace and newlines
-	words := strings.Fields(commentBody)
+	// Process each line separately to avoid matching in regular sentences
+	lines := strings.Split(commentBody, "\n")
+	for _, line := range lines {
+		if isCommandHeavyLine(line, cfg) {
+			extractCommandsFromLine(line, cfg, commandsFound)
+		}
+	}
+}
+
+// isCommandHeavyLine checks if a line is "command-heavy" (>66% commands/fillers)
+func isCommandHeavyLine(line string, cfg *config.Config) bool {
+	fillerWords := map[string]bool{
+		"and": true, "please": true, "this": true, "the": true, "it": true,
+	}
+
+	words := strings.Fields(line)
+	if len(words) == 0 {
+		return false
+	}
+
+	commandWordCount := 0
+	totalNonMentionWords := 0
+
 	for _, word := range words {
-		word = strings.ToLower(strings.TrimSpace(word))
-		if cmdType := resolveCommand(word, cfg); cmdType != CommandUnknown {
+		cleanWord := strings.ToLower(strings.TrimSpace(word))
+		cleanWord = strings.Trim(cleanWord, ".,!?;:")
+
+		// Skip @ mentions in the word count
+		if strings.HasPrefix(word, "@") {
+			continue
+		}
+
+		totalNonMentionWords++
+
+		if resolveCommand(cleanWord, cfg) != CommandUnknown || fillerWords[cleanWord] {
+			commandWordCount++
+		}
+	}
+
+	if totalNonMentionWords == 0 {
+		return false
+	}
+
+	// Only process this line if > 66% of words are commands/fillers
+	return float64(commandWordCount)/float64(totalNonMentionWords) > 0.66
+}
+
+// extractCommandsFromLine extracts all commands from a line
+func extractCommandsFromLine(line string, cfg *config.Config, commandsFound map[CommandType]bool) {
+	words := strings.Fields(line)
+	for _, word := range words {
+		cleanWord := strings.ToLower(strings.TrimSpace(word))
+		cleanWord = strings.Trim(cleanWord, ".,!?;:")
+
+		if cmdType := resolveCommand(cleanWord, cfg); cmdType != CommandUnknown {
 			commandsFound[cmdType] = true
 		}
 	}

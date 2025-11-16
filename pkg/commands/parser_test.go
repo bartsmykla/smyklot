@@ -491,5 +491,48 @@ Thanks for the PR!`
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 		})
+
+		Context("when avoiding accidental bare command matches", func() {
+			It("should NOT match bare commands in regular sentences", func() {
+				cmd, err := commands.ParseCommand("I think we should approve this change", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(BeEmpty())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should NOT match in longer explanatory text", func() {
+				cmd, err := commands.ParseCommand("Let's approve this PR after the tests pass", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(BeEmpty())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should NOT match in questions", func() {
+				cmd, err := commands.ParseCommand("Can someone approve this?", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(BeEmpty())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should match when line is mostly commands", func() {
+				cmd, err := commands.ParseCommand("approve and merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should match on command-only lines in multiline text", func() {
+				text := `This looks good!
+approve
+merge
+Thanks!`
+				cmd, err := commands.ParseCommand(text, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+		})
 	})
 })
