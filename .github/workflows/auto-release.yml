@@ -1,0 +1,80 @@
+name: Auto Release
+
+on:
+  schedule:
+    # Run daily at 10:00 UTC
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (leave empty for auto)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  auto-release:
+    name: Automatic Release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ secrets.SMYKLOT_APP_ID }}
+          private-key: ${{ secrets.SMYKLOT_PRIVATE_KEY }}
+
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "smyklot[bot]"
+          git config user.email "smyklot[bot]@users.noreply.github.com"
+
+      - name: Determine next version
+        id: version
+        uses: paulhatch/semantic-version@a8f8f59fd7f0625188492e945240f12d7ad2dca3 # v5.4.0
+        with:
+          major_pattern: '(BREAKING CHANGE)|(\w+!):'
+          minor_pattern: '(feat:|feat\(.*\):)'
+          version_format: '${major}.${minor}.${patch}'
+          bump_each_commit: false
+
+      - name: Check if release needed
+        id: check
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          CALCULATED_VERSION: ${{ steps.version.outputs.version }}
+          VERSION_CHANGED: ${{ steps.version.outputs.changed }}
+        run: |
+          if [[ -n "$INPUT_VERSION" ]]; then
+            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$VERSION_CHANGED" == "false" ]]; then
+            echo "No new commits since last release"
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$CALCULATED_VERSION" >> "$GITHUB_OUTPUT"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install mise
+        if: steps.check.outputs.needed == 'true'
+        uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
+        with:
+          cache: true
+          install: task
+
+      - name: Create release
+        if: steps.check.outputs.needed == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          task release "VERSION=$RELEASE_VERSION"
