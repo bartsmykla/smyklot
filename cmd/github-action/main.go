@@ -318,28 +318,41 @@ func run(_ *cobra.Command, _ []string) error {
 		return handleUnauthorized(client, checker, prNum, commentIDNum)
 	}
 
-	// Execute all commands in order
+	// Add eyes reaction to acknowledge command
+	if err := addEyesReaction(client, commentIDNum); err != nil {
+		return err
+	}
+
+	// Execute all commands and collect feedback
+	var feedbacks []*feedback.Feedback
+
 	for _, cmdType := range parsedCmd.Commands {
+		var fb *feedback.Feedback
+		var err error
+
 		switch cmdType {
 		case commands.CommandApprove:
-			if err := handleApprove(client, prNum, commentIDNum); err != nil {
-				return err
-			}
+			fb, err = executeApprove(client, prNum)
 		case commands.CommandMerge:
-			if err := handleMerge(client, prNum, commentIDNum); err != nil {
-				return err
-			}
+			fb, err = executeMerge(client, prNum)
 		case commands.CommandUnapprove:
-			if err := handleUnapprove(client, prNum, commentIDNum); err != nil {
-				return err
-			}
+			fb, err = executeUnapprove(client, prNum)
 		default:
 			// Unknown command type, ignore
 			continue
 		}
+
+		if err != nil {
+			return err
+		}
+
+		feedbacks = append(feedbacks, fb)
 	}
 
-	return nil
+	// Combine all feedback and post once
+	combinedFeedback := feedback.CombineFeedback(feedbacks, botConfig.QuietSuccess)
+
+	return postCombinedFeedback(client, prNum, commentIDNum, combinedFeedback)
 }
 
 // loadConfig loads configuration from environment variables if not set via flags
@@ -483,6 +496,16 @@ func handleUnauthorized(
 }
 
 // handleApprove handles the /approve command.
+// executeApprove executes the approve command and returns feedback
+func executeApprove(client *github.Client, prNum int) (*feedback.Feedback, error) {
+	// Approve the PR
+	if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+		return feedback.NewApprovalFailed(err.Error()), nil
+	}
+
+	return feedback.NewApprovalSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+}
+
 func handleApprove(client *github.Client, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
 	if err := addEyesReaction(client, commentID); err != nil {
@@ -505,6 +528,27 @@ func handleApprove(client *github.Client, prNum, commentID int) error {
 	fb := feedback.NewApprovalSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+}
+
+// executeMerge executes the merge command and returns feedback
+func executeMerge(client *github.Client, prNum int) (*feedback.Feedback, error) {
+	// Get PR info to check if it's mergeable
+	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	if err != nil {
+		return feedback.NewMergeFailed(err.Error()), nil
+	}
+
+	// Check if PR is mergeable
+	if !info.Mergeable {
+		return feedback.NewNotMergeable(), nil
+	}
+
+	// Merge the PR
+	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+		return feedback.NewMergeFailed(err.Error()), nil
+	}
+
+	return feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
 }
 
 // handleMerge handles the /merge command.
@@ -550,6 +594,16 @@ func handleMerge(client *github.Client, prNum, commentID int) error {
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
+// executeUnapprove executes the unapprove command and returns feedback
+func executeUnapprove(client *github.Client, prNum int) (*feedback.Feedback, error) {
+	// Dismiss the review
+	if err := client.DismissReview(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+		return feedback.NewUnapproveFailed(err.Error()), nil
+	}
+
+	return feedback.NewUnapproveSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+}
+
 // handleUnapprove handles the /unapprove command.
 func handleUnapprove(client *github.Client, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
@@ -573,6 +627,46 @@ func handleUnapprove(client *github.Client, prNum, commentID int) error {
 	fb := feedback.NewUnapproveSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+}
+
+// postCombinedFeedback posts combined feedback with appropriate reaction
+func postCombinedFeedback(client *github.Client, prNum, commentID int, fb *feedback.Feedback) error {
+	// Map feedback type to reaction
+	var reaction github.ReactionType
+	switch fb.Type {
+	case feedback.Success:
+		reaction = github.ReactionSuccess
+	case feedback.Error:
+		reaction = github.ReactionError
+	case feedback.Warning:
+		reaction = github.ReactionWarning
+	default:
+		reaction = github.ReactionSuccess
+	}
+
+	// Post comment if there's a message
+	if fb.RequiresComment() {
+		if err := client.PostComment(
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			prNum,
+			fb.Message,
+		); err != nil {
+			return NewGitHubError(ErrPostComment, err)
+		}
+	}
+
+	// Add reaction
+	if err := client.AddReaction(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		commentID,
+		reaction,
+	); err != nil {
+		return NewGitHubError(ErrAddReaction, err)
+	}
+
+	return nil
 }
 
 // handleDeletedComment posts a notification that a command comment was deleted.

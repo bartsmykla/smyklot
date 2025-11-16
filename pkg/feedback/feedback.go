@@ -435,3 +435,84 @@ func formatApproverList(approvers []string) string {
 
 	return strings.TrimSuffix(builder.String(), "\n")
 }
+
+// CombineFeedback combines multiple feedback items into a single feedback
+//
+// Returns combined feedback with:
+//   - Type: Error if any errors, Warning if mixed success/warning, Success if all success
+//   - Emoji: ❌ for all errors, 😕 for mixed results, ✅ for all success
+//   - Message: Combined messages from all feedback items (respecting quietSuccess)
+func CombineFeedback(feedbacks []*Feedback, quietSuccess bool) *Feedback {
+	if len(feedbacks) == 0 {
+		return NewSuccess()
+	}
+
+	if len(feedbacks) == 1 {
+		return feedbacks[0]
+	}
+
+	// Count feedback types
+	var successCount, errorCount, warningCount int
+	var messages []string
+
+	for _, f := range feedbacks {
+		switch f.Type {
+		case Success:
+			successCount++
+			// Only include success messages if not quietSuccess
+			if !quietSuccess && f.Message != "" {
+				messages = append(messages, f.Message)
+			}
+		case Error:
+			errorCount++
+			if f.Message != "" {
+				messages = append(messages, f.Message)
+			}
+		case Warning:
+			warningCount++
+			if f.Message != "" {
+				messages = append(messages, f.Message)
+			}
+		}
+	}
+
+	// Determine overall type and emoji
+	var feedbackType Type
+	var emoji string
+
+	if errorCount > 0 && successCount == 0 && warningCount == 0 {
+		// All errors
+		feedbackType = Error
+		emoji = "❌"
+	} else if errorCount == 0 && successCount > 0 && warningCount == 0 {
+		// All success
+		feedbackType = Success
+		emoji = "✅"
+	} else {
+		// Mixed results (partial success)
+		feedbackType = Warning
+		emoji = "😕"
+	}
+
+	// Combine messages
+	var combinedMessage string
+	if len(messages) > 0 {
+		// Add header for mixed results
+		if feedbackType == Warning {
+			combinedMessage = "**Partial Success**\n\n" + strings.Join(messages, "\n\n---\n\n")
+		} else {
+			combinedMessage = strings.Join(messages, "\n\n---\n\n")
+		}
+	}
+
+	// For all-success with quietSuccess, don't include message
+	if feedbackType == Success && quietSuccess {
+		combinedMessage = ""
+	}
+
+	return &Feedback{
+		Type:    feedbackType,
+		Emoji:   emoji,
+		Message: combinedMessage,
+	}
+}
