@@ -34,64 +34,35 @@ archives:
       - LICENSE
       - README.md
 
-dockers:
-  - image_templates:
-      - "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}-amd64"
-      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}-amd64"
-      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}-amd64"
+dockers_v2:
+  - ids:
+      - smyklot
+    images:
+      - ghcr.io/bartsmykla/smyklot
+    tags:
+      - "{{ trimprefix .Tag \"v\" }}"
+      - "{{ .Major }}"
+      - "{{ .Major }}.{{ .Minor }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
     dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/bartsmykla/smyklot"
     extra_files:
       - go.mod
       - go.sum
       - cmd
       - pkg
-    goarch: amd64
+    labels:
+      org.opencontainers.image.title: "{{.ProjectName}}"
+      org.opencontainers.image.description: "Automated PR approvals and merges based on CODEOWNERS"
+      org.opencontainers.image.url: "https://github.com/bartsmykla/smyklot"
+      org.opencontainers.image.source: "{{.GitURL}}"
+      org.opencontainers.image.version: "{{.Version}}"
+      org.opencontainers.image.created: "{{.Date}}"
+      org.opencontainers.image.revision: "{{.FullCommit}}"
+      org.opencontainers.image.licenses: MIT
 
-  - image_templates:
-      - "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}-arm64"
-      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}-arm64"
-      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}-arm64"
-    dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/bartsmykla/smyklot"
-    extra_files:
-      - go.mod
-      - go.sum
-      - cmd
-      - pkg
-    goarch: arm64
-
-docker_manifests:
-  - name_template: "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}"
-    image_templates:
-      - "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}-amd64"
-      - "ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag \"v\" }}-arm64"
-  
-  - name_template: "ghcr.io/bartsmykla/smyklot:{{ .Major }}"
-    image_templates:
-      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}-amd64"
-      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}-arm64"
-  
-  - name_template: "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}"
-    image_templates:
-      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}-amd64"
-      - "ghcr.io/bartsmykla/smyklot:{{ .Major }}.{{ .Minor }}-arm64"
-
-checksum:
+checksums:
   name_template: 'checksums.txt'
 
 snapshot:
@@ -99,6 +70,7 @@ snapshot:
 
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
       - '^docs:'
@@ -106,10 +78,24 @@ changelog:
       - '^ci:'
       - '^chore:'
       - '^build:'
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Performance Improvements
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
 
 release:
-  github:
-    owner: bartsmykla
-    name: smyklot
   draft: false
   prerelease: auto
+  mode: append
+  header: |
+    ## Smyklot {{.Tag}}
+
+    Docker image: `ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag "v" }}`
