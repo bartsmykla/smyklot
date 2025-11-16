@@ -6,6 +6,7 @@ package github
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -66,14 +67,19 @@ func NewClient(token, baseURL string) (*Client, error) {
 //
 // The reaction parameter should be one of the ReactionType constants
 // (ReactionSuccess, ReactionError, ReactionWarning, ReactionEyes).
-func (c *Client) AddReaction(owner, repo string, commentID int, reaction ReactionType) error {
+func (c *Client) AddReaction(
+	ctx context.Context,
+	owner, repo string,
+	commentID int,
+	reaction ReactionType,
+) error {
 	path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d/reactions", owner, repo, commentID)
 
 	body := map[string]string{
 		"content": string(reaction),
 	}
 
-	_, err := c.makeRequest("POST", path, body)
+	_, err := c.makeRequest(ctx, "POST", path, body)
 	return err
 }
 
@@ -81,11 +87,16 @@ func (c *Client) AddReaction(owner, repo string, commentID int, reaction Reactio
 //
 // The reaction parameter should be one of the ReactionType constants.
 // This retrieves all reactions on the comment and deletes matching ones.
-func (c *Client) RemoveReaction(owner, repo string, commentID int, reaction ReactionType) error {
+func (c *Client) RemoveReaction(
+	ctx context.Context,
+	owner, repo string,
+	commentID int,
+	reaction ReactionType,
+) error {
 	// First, get all reactions on the comment
 	path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d/reactions", owner, repo, commentID)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return err
 	}
@@ -106,7 +117,7 @@ func (c *Client) RemoveReaction(owner, repo string, commentID int, reaction Reac
 					commentID,
 					int(id),
 				)
-				if _, err := c.makeRequest("DELETE", deletePath, nil); err != nil {
+				if _, err := c.makeRequest(ctx, "DELETE", deletePath, nil); err != nil {
 					return err
 				}
 			}
@@ -119,7 +130,7 @@ func (c *Client) RemoveReaction(owner, repo string, commentID int, reaction Reac
 // PostComment posts a comment on a pull request
 //
 // The body parameter must not be empty.
-func (c *Client) PostComment(owner, repo string, prNumber int, body string) error {
+func (c *Client) PostComment(ctx context.Context, owner, repo string, prNumber int, body string) error {
 	if body == "" {
 		return ErrEmptyComment
 	}
@@ -130,21 +141,21 @@ func (c *Client) PostComment(owner, repo string, prNumber int, body string) erro
 		"body": body,
 	}
 
-	_, err := c.makeRequest("POST", path, payload)
+	_, err := c.makeRequest(ctx, "POST", path, payload)
 	return err
 }
 
 // ApprovePR approves a pull request
 //
 // This creates a review with the APPROVE event.
-func (c *Client) ApprovePR(owner, repo string, prNumber int) error {
+func (c *Client) ApprovePR(ctx context.Context, owner, repo string, prNumber int) error {
 	path := fmt.Sprintf("/repos/%s/%s/pulls/%d/reviews", owner, repo, prNumber)
 
 	payload := map[string]string{
 		"event": "APPROVE",
 	}
 
-	_, err := c.makeRequestWithRetry("POST", path, payload)
+	_, err := c.makeRequestWithRetry(ctx, "POST", path, payload)
 	return err
 }
 
@@ -152,32 +163,37 @@ func (c *Client) ApprovePR(owner, repo string, prNumber int) error {
 //
 // WARNING: This method calls GET /user which requires special permissions
 // not granted to GitHub App installation tokens. Use DismissReviewByUsername instead.
-func (c *Client) DismissReview(owner, repo string, prNumber int) error {
-	username, err := c.GetAuthenticatedUser()
+func (c *Client) DismissReview(ctx context.Context, owner, repo string, prNumber int) error {
+	username, err := c.GetAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
-	return c.DismissReviewByUsername(owner, repo, prNumber, username)
+	return c.DismissReviewByUsername(ctx, owner, repo, prNumber, username)
 }
 
 // DismissReviewByUsername dismisses all approved reviews by the specified username
 //
 // This finds all APPROVED reviews by the specified user and dismisses them.
 // Recommended for GitHub App installations to avoid GET /user permission issues.
-func (c *Client) DismissReviewByUsername(owner, repo string, prNumber int, username string) error {
-	reviews, err := c.getPullRequestReviews(owner, repo, prNumber)
+func (c *Client) DismissReviewByUsername(
+	ctx context.Context,
+	owner, repo string,
+	prNumber int,
+	username string,
+) error {
+	reviews, err := c.getPullRequestReviews(ctx, owner, repo, prNumber)
 	if err != nil {
 		return err
 	}
 
-	return c.dismissApprovedReviews(owner, repo, prNumber, username, reviews)
+	return c.dismissApprovedReviews(ctx, owner, repo, prNumber, username, reviews)
 }
 
 // GetAuthenticatedUser retrieves the authenticated user's username
-func (c *Client) GetAuthenticatedUser() (string, error) {
+func (c *Client) GetAuthenticatedUser(ctx context.Context) (string, error) {
 	userPath := "/user"
-	userData, err := c.makeRequest("GET", userPath, nil)
+	userData, err := c.makeRequest(ctx, "GET", userPath, nil)
 	if err != nil {
 		return "", err
 	}
@@ -196,9 +212,13 @@ func (c *Client) GetAuthenticatedUser() (string, error) {
 }
 
 // getPullRequestReviews retrieves all reviews for a pull request
-func (c *Client) getPullRequestReviews(owner, repo string, prNumber int) ([]map[string]interface{}, error) {
+func (c *Client) getPullRequestReviews(
+	ctx context.Context,
+	owner, repo string,
+	prNumber int,
+) ([]map[string]interface{}, error) {
 	reviewsPath := fmt.Sprintf("/repos/%s/%s/pulls/%d/reviews", owner, repo, prNumber)
-	reviewsData, err := c.makeRequest("GET", reviewsPath, nil)
+	reviewsData, err := c.makeRequest(ctx, "GET", reviewsPath, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -213,13 +233,14 @@ func (c *Client) getPullRequestReviews(owner, repo string, prNumber int) ([]map[
 
 // dismissApprovedReviews dismisses all approved reviews by the specified user
 func (c *Client) dismissApprovedReviews(
+	ctx context.Context,
 	owner, repo string,
 	prNumber int,
 	username string,
 	reviews []map[string]interface{},
 ) error {
 	for _, review := range reviews {
-		if err := c.dismissReviewIfApprovedByUser(owner, repo, prNumber, username, review); err != nil {
+		if err := c.dismissReviewIfApprovedByUser(ctx, owner, repo, prNumber, username, review); err != nil {
 			return err
 		}
 	}
@@ -229,6 +250,7 @@ func (c *Client) dismissApprovedReviews(
 
 // dismissReviewIfApprovedByUser dismisses a review if it's approved by the specified user
 func (c *Client) dismissReviewIfApprovedByUser(
+	ctx context.Context,
 	owner, repo string,
 	prNumber int,
 	username string,
@@ -265,21 +287,21 @@ func (c *Client) dismissReviewIfApprovedByUser(
 		"message": "Review dismissed",
 	}
 
-	_, err := c.makeRequest("PUT", dismissPath, payload)
+	_, err := c.makeRequest(ctx, "PUT", dismissPath, payload)
 	return err
 }
 
 // MergePR merges a pull request using the specified merge method
 //
 // Supported merge methods: merge, squash, rebase
-func (c *Client) MergePR(owner, repo string, prNumber int, method MergeMethod) error {
+func (c *Client) MergePR(ctx context.Context, owner, repo string, prNumber int, method MergeMethod) error {
 	path := fmt.Sprintf("/repos/%s/%s/pulls/%d/merge", owner, repo, prNumber)
 
 	body := map[string]interface{}{
 		"merge_method": string(method),
 	}
 
-	_, err := c.makeRequestWithRetry("PUT", path, body)
+	_, err := c.makeRequestWithRetry(ctx, "PUT", path, body)
 	return err
 }
 
@@ -287,10 +309,15 @@ func (c *Client) MergePR(owner, repo string, prNumber int, method MergeMethod) e
 //
 // This will automatically merge the PR when all required checks pass.
 // Uses GraphQL API as auto-merge is not available in REST API.
-func (c *Client) EnableAutoMerge(owner, repo string, prNumber int, method MergeMethod) error {
+func (c *Client) EnableAutoMerge(
+	ctx context.Context,
+	owner, repo string,
+	prNumber int,
+	method MergeMethod,
+) error {
 	// Get PR node ID first (required for GraphQL)
 	path := fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, repo, prNumber)
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return err
 	}
@@ -338,7 +365,7 @@ func (c *Client) EnableAutoMerge(owner, repo string, prNumber int, method MergeM
 		},
 	}
 
-	_, err = c.makeRequest("POST", graphqlPath, query)
+	_, err = c.makeRequest(ctx, "POST", graphqlPath, query)
 	return err
 }
 
@@ -371,10 +398,10 @@ func parseReactions(rawReactions []map[string]interface{}) []Reaction {
 //
 // Returns a slice of Reaction structs containing user and reaction type information.
 // This gets reactions on the PR description/body, not on comments.
-func (c *Client) GetPRReactions(owner, repo string, prNumber int) ([]Reaction, error) {
+func (c *Client) GetPRReactions(ctx context.Context, owner, repo string, prNumber int) ([]Reaction, error) {
 	path := fmt.Sprintf("/repos/%s/%s/issues/%d/reactions", owner, repo, prNumber)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -390,10 +417,14 @@ func (c *Client) GetPRReactions(owner, repo string, prNumber int) ([]Reaction, e
 // GetCommentReactions retrieves all reactions for a comment
 //
 // Returns a slice of Reaction structs containing user and reaction type information.
-func (c *Client) GetCommentReactions(owner, repo string, commentID int) ([]Reaction, error) {
+func (c *Client) GetCommentReactions(
+	ctx context.Context,
+	owner, repo string,
+	commentID int,
+) ([]Reaction, error) {
 	path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d/reactions", owner, repo, commentID)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -407,30 +438,30 @@ func (c *Client) GetCommentReactions(owner, repo string, commentID int) ([]React
 }
 
 // AddLabel adds a label to a pull request
-func (c *Client) AddLabel(owner, repo string, prNumber int, label string) error {
+func (c *Client) AddLabel(ctx context.Context, owner, repo string, prNumber int, label string) error {
 	path := fmt.Sprintf("/repos/%s/%s/issues/%d/labels", owner, repo, prNumber)
 
 	payload := map[string][]string{
 		"labels": {label},
 	}
 
-	_, err := c.makeRequest("POST", path, payload)
+	_, err := c.makeRequest(ctx, "POST", path, payload)
 	return err
 }
 
 // RemoveLabel removes a label from a pull request
-func (c *Client) RemoveLabel(owner, repo string, prNumber int, label string) error {
+func (c *Client) RemoveLabel(ctx context.Context, owner, repo string, prNumber int, label string) error {
 	path := fmt.Sprintf("/repos/%s/%s/issues/%d/labels/%s", owner, repo, prNumber, label)
 
-	_, err := c.makeRequest("DELETE", path, nil)
+	_, err := c.makeRequest(ctx, "DELETE", path, nil)
 	return err
 }
 
 // GetLabels retrieves all labels from a pull request
-func (c *Client) GetLabels(owner, repo string, prNumber int) ([]string, error) {
+func (c *Client) GetLabels(ctx context.Context, owner, repo string, prNumber int) ([]string, error) {
 	path := fmt.Sprintf("/repos/%s/%s/issues/%d/labels", owner, repo, prNumber)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -454,10 +485,10 @@ func (c *Client) GetLabels(owner, repo string, prNumber int) ([]string, error) {
 //
 // Returns the decoded content of .github/CODEOWNERS file.
 // Returns empty string (not error) if file doesn't exist (404).
-func (c *Client) GetCodeowners(owner, repo string) (string, error) {
+func (c *Client) GetCodeowners(ctx context.Context, owner, repo string) (string, error) {
 	path := fmt.Sprintf("/repos/%s/%s/contents/.github/CODEOWNERS", owner, repo)
 
-	data, err := c.makeRequestWithRetry("GET", path, nil)
+	data, err := c.makeRequestWithRetry(ctx, "GET", path, nil)
 	if err != nil {
 		// Return empty string if CODEOWNERS doesn't exist (404)
 		var apiErr *APIError
@@ -507,10 +538,10 @@ func (c *Client) GetCodeowners(owner, repo string) (string, error) {
 //
 // Returns a PRInfo struct with details about the PR including number, state,
 // mergeable status, author, and approvers.
-func (c *Client) GetPRInfo(owner, repo string, prNumber int) (*PRInfo, error) {
+func (c *Client) GetPRInfo(ctx context.Context, owner, repo string, prNumber int) (*PRInfo, error) {
 	path := fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, repo, prNumber)
 
-	data, err := c.makeRequestWithRetry("GET", path, nil)
+	data, err := c.makeRequestWithRetry(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -553,14 +584,14 @@ func (c *Client) GetPRInfo(owner, repo string, prNumber int) (*PRInfo, error) {
 	}
 
 	// Populate ApprovedBy field
-	info.ApprovedBy = c.getApprovers(owner, repo, prNumber)
+	info.ApprovedBy = c.getApprovers(ctx, owner, repo, prNumber)
 
 	return info, nil
 }
 
 // getApprovers retrieves the list of users who have approved a PR
-func (c *Client) getApprovers(owner, repo string, prNumber int) []string {
-	reviews, err := c.getPullRequestReviews(owner, repo, prNumber)
+func (c *Client) getApprovers(ctx context.Context, owner, repo string, prNumber int) []string {
+	reviews, err := c.getPullRequestReviews(ctx, owner, repo, prNumber)
 	if err != nil {
 		// Return empty slice if we can't get reviews
 		return []string{}
@@ -608,10 +639,14 @@ func (c *Client) extractApproverFromReview(review map[string]interface{}) string
 // GetPRComments retrieves all comments on a pull request
 //
 // Returns a slice of comment data including ID, user, and body.
-func (c *Client) GetPRComments(owner, repo string, prNumber int) ([]map[string]interface{}, error) {
+func (c *Client) GetPRComments(
+	ctx context.Context,
+	owner, repo string,
+	prNumber int,
+) ([]map[string]interface{}, error) {
 	path := fmt.Sprintf("/repos/%s/%s/issues/%d/comments", owner, repo, prNumber)
 
-	data, err := c.makeRequestWithRetry("GET", path, nil)
+	data, err := c.makeRequestWithRetry(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -625,20 +660,20 @@ func (c *Client) GetPRComments(owner, repo string, prNumber int) ([]map[string]i
 }
 
 // DeleteComment deletes a comment from a pull request
-func (c *Client) DeleteComment(owner, repo string, commentID int) error {
+func (c *Client) DeleteComment(ctx context.Context, owner, repo string, commentID int) error {
 	path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d", owner, repo, commentID)
 
-	_, err := c.makeRequest("DELETE", path, nil)
+	_, err := c.makeRequest(ctx, "DELETE", path, nil)
 	return err
 }
 
 // GetOpenPRs retrieves all open pull requests in a repository
 //
 // Returns a slice of PR data including number, title, and state.
-func (c *Client) GetOpenPRs(owner, repo string) ([]map[string]interface{}, error) {
+func (c *Client) GetOpenPRs(ctx context.Context, owner, repo string) ([]map[string]interface{}, error) {
 	path := fmt.Sprintf("/repos/%s/%s/pulls", owner, repo)
 
-	data, err := c.makeRequestWithRetry("GET", path, nil)
+	data, err := c.makeRequestWithRetry(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -660,10 +695,10 @@ func (c *Client) GetOpenPRs(owner, repo string) ([]map[string]interface{}, error
 }
 
 // HasWritePermission checks if the user has write/admin permission to the repository
-func (c *Client) HasWritePermission(owner, repo, username string) (bool, error) {
+func (c *Client) HasWritePermission(ctx context.Context, owner, repo, username string) (bool, error) {
 	path := fmt.Sprintf("/repos/%s/%s/collaborators/%s/permission", owner, repo, username)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequest(ctx, "GET", path, nil)
 	if err != nil {
 		// If user is not a collaborator, return false (not an error)
 		var apiErr *APIError
@@ -694,10 +729,10 @@ func (c *Client) HasWritePermission(owner, repo, username string) (bool, error) 
 }
 
 // IsMergeQueueEnabled checks if merge queue is enabled for a branch
-func (c *Client) IsMergeQueueEnabled(owner, repo, branch string) (bool, error) {
+func (c *Client) IsMergeQueueEnabled(ctx context.Context, owner, repo, branch string) (bool, error) {
 	path := fmt.Sprintf("/repos/%s/%s/branches/%s/protection", owner, repo, branch)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequest(ctx, "GET", path, nil)
 	if err != nil {
 		// 404 means branch protection not enabled
 		var apiErr *APIError
@@ -730,11 +765,15 @@ func (c *Client) IsMergeQueueEnabled(owner, repo, branch string) (bool, error) {
 }
 
 // makeRequestWithRetry makes an HTTP request with retry logic and exponential backoff
-func (c *Client) makeRequestWithRetry(method, path string, payload interface{}) ([]byte, error) {
+func (c *Client) makeRequestWithRetry(
+	ctx context.Context,
+	method, path string,
+	payload interface{},
+) ([]byte, error) {
 	var lastErr error
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		data, err := c.makeRequest(method, path, payload)
+		data, err := c.makeRequest(ctx, method, path, payload)
 		if err == nil {
 			return data, nil
 		}
@@ -760,7 +799,7 @@ func (c *Client) makeRequestWithRetry(method, path string, payload interface{}) 
 }
 
 // makeRequest makes an HTTP request to the GitHub API
-func (c *Client) makeRequest(method, path string, payload interface{}) ([]byte, error) {
+func (c *Client) makeRequest(ctx context.Context, method, path string, payload interface{}) ([]byte, error) {
 	url := c.baseURL + path
 
 	var body io.Reader
@@ -772,7 +811,7 @@ func (c *Client) makeRequest(method, path string, payload interface{}) ([]byte, 
 		body = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, NewAPIError(ErrAPIRequest, 0, method, path, err)
 	}

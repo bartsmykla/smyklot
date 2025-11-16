@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -42,6 +43,9 @@ func init() {
 }
 
 func runPoll(cmd *cobra.Command, _ []string) error {
+	// Create context from command
+	ctx := cmd.Context()
+
 	// Create Viper instance
 	v := viper.New()
 	config.SetupViper(v)
@@ -73,13 +77,13 @@ func runPoll(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Setup GitHub client and permission checker
-	client, checker, err := setupPollClients(token, repoOwner, repoName)
+	client, checker, err := setupPollClients(ctx, token, repoOwner, repoName)
 	if err != nil {
 		return err
 	}
 
 	// Poll and process all open PRs
-	return pollAllPRs(client, checker, bc, repoOwner, repoName)
+	return pollAllPRs(ctx, client, checker, bc, repoOwner, repoName)
 }
 
 // loadPollBotConfig loads bot configuration from JSON config and Viper
@@ -148,6 +152,7 @@ func parseRepo(repo string) (string, string, error) {
 
 // setupPollClients creates GitHub client and permission checker
 func setupPollClients(
+	ctx context.Context,
 	token, repoOwner, repoName string,
 ) (*github.Client, *permissions.Checker, error) {
 	// Create GitHub client
@@ -157,7 +162,7 @@ func setupPollClients(
 	}
 
 	// Fetch CODEOWNERS (returns empty string if not found)
-	codeownersContent, err := client.GetCodeowners(repoOwner, repoName)
+	codeownersContent, err := client.GetCodeowners(ctx, repoOwner, repoName)
 	if err != nil {
 		return nil, nil, NewGitHubError(ErrGetCodeowners, err)
 	}
@@ -178,6 +183,7 @@ func setupPollClients(
 
 // pollAllPRs polls and processes reactions on all open PRs
 func pollAllPRs(
+	ctx context.Context,
 	client *github.Client,
 	checker *permissions.Checker,
 	bc *config.Config,
@@ -186,7 +192,7 @@ func pollAllPRs(
 	fmt.Printf("Polling PR reactions in %s/%s\n", repoOwner, repoName)
 
 	// Get all open PRs
-	prs, err := client.GetOpenPRs(repoOwner, repoName)
+	prs, err := client.GetOpenPRs(ctx, repoOwner, repoName)
 	if err != nil {
 		return NewGitHubError(ErrGetCodeowners, err)
 	}
@@ -200,7 +206,7 @@ func pollAllPRs(
 
 	// Process reactions on each PR
 	for _, pr := range prs {
-		if err := processPR(client, checker, bc, repoOwner, repoName, pr); err != nil {
+		if err := processPR(ctx, client, checker, bc, repoOwner, repoName, pr); err != nil {
 			fmt.Fprintf(os.Stderr, "  Warning: %v\n", err)
 		}
 	}
@@ -212,6 +218,7 @@ func pollAllPRs(
 
 // processPR processes reactions on a single PR
 func processPR(
+	ctx context.Context,
 	client *github.Client,
 	checker *permissions.Checker,
 	bc *config.Config,
@@ -251,7 +258,7 @@ func processPR(
 
 	// Process reactions if not disabled
 	if !bc.DisableReactions {
-		if err := handleReactions(client, rc, bc, checker, prNumber, prNumber); err != nil {
+		if err := handleReactions(ctx, client, rc, bc, checker, prNumber, prNumber); err != nil {
 			return fmt.Errorf("failed to process reactions on PR #%d: %w", prNumber, err)
 		}
 	}

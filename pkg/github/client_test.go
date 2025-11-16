@@ -1,6 +1,7 @@
 package github_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -67,7 +68,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.AddReaction("owner", "repo", 123, github.ReactionSuccess)
+				err = client.AddReaction(context.Background(), "owner", "repo", 123, github.ReactionSuccess)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -87,7 +88,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.AddReaction("owner", "repo", 456, github.ReactionError)
+				err = client.AddReaction(context.Background(), "owner", "repo", 456, github.ReactionError)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -102,7 +103,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.AddReaction("owner", "repo", 123, github.ReactionSuccess)
+				err = client.AddReaction(context.Background(), "owner", "repo", 123, github.ReactionSuccess)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("401"))
 			})
@@ -132,7 +133,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.PostComment("owner", "repo", 1, "Test comment")
+				err = client.PostComment(context.Background(), "owner", "repo", 1, "Test comment")
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -140,7 +141,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", "")
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.PostComment("owner", "repo", 1, "")
+				err = client.PostComment(context.Background(), "owner", "repo", 1, "")
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(MatchRegexp(`(?i)empty.*comment`))
 			})
@@ -156,7 +157,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.PostComment("owner", "repo", 1, "Test comment")
+				err = client.PostComment(context.Background(), "owner", "repo", 1, "Test comment")
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -185,7 +186,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.ApprovePR("owner", "repo", 1)
+				err = client.ApprovePR(context.Background(), "owner", "repo", 1)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -200,7 +201,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.ApprovePR("owner", "repo", 1)
+				err = client.ApprovePR(context.Background(), "owner", "repo", 1)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -225,7 +226,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.MergePR("owner", "repo", 1, github.MergeMethodMerge)
+				err = client.MergePR(context.Background(), "owner", "repo", 1, github.MergeMethodMerge)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -240,7 +241,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.MergePR("owner", "repo", 1, github.MergeMethodMerge)
+				err = client.MergePR(context.Background(), "owner", "repo", 1, github.MergeMethodMerge)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("409"))
 			})
@@ -256,7 +257,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.MergePR("owner", "repo", 1, github.MergeMethodMerge)
+				err = client.MergePR(context.Background(), "owner", "repo", 1, github.MergeMethodMerge)
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -303,7 +304,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				info, err := client.GetPRInfo("owner", "repo", 1)
+				info, err := client.GetPRInfo(context.Background(), "owner", "repo", 1)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(info).NotTo(BeNil())
 				Expect(info.Number).To(Equal(1))
@@ -325,7 +326,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				_, err = client.GetPRInfo("owner", "repo", 999)
+				_, err = client.GetPRInfo(context.Background(), "owner", "repo", 999)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("404"))
 			})
@@ -339,7 +340,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", "http://invalid-url-that-does-not-exist.local")
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.AddReaction("owner", "repo", 1, github.ReactionSuccess)
+				err = client.AddReaction(context.Background(), "owner", "repo", 1, github.ReactionSuccess)
 				Expect(err).To(HaveOccurred())
 			})
 
@@ -352,7 +353,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				_, err = client.GetPRInfo("owner", "repo", 1)
+				_, err = client.GetPRInfo(context.Background(), "owner", "repo", 1)
 				Expect(err).To(HaveOccurred())
 			})
 		})
