@@ -26,6 +26,7 @@ var (
 		"merge":      CommandMerge,
 		"unapprove":  CommandUnapprove,
 		"disapprove": CommandUnapprove,
+		"help":       CommandHelp,
 	}
 
 	// ErrContradictingCommands indicates contradicting commands were found
@@ -330,7 +331,7 @@ func isLineOnlyCommandsAndFillers(line string, cfg *config.Config) bool {
 // buildCommandList converts the commands map to an ordered slice
 func buildCommandList(commandsFound map[CommandType]bool) []CommandType {
 	var commands []CommandType
-	// Maintain consistent order: approve, merge, unapprove
+	// Maintain consistent order: approve, merge, unapprove, help
 	if commandsFound[CommandApprove] {
 		commands = append(commands, CommandApprove)
 	}
@@ -339,6 +340,9 @@ func buildCommandList(commandsFound map[CommandType]bool) []CommandType {
 	}
 	if commandsFound[CommandUnapprove] {
 		commands = append(commands, CommandUnapprove)
+	}
+	if commandsFound[CommandHelp] {
+		commands = append(commands, CommandHelp)
 	}
 
 	return commands

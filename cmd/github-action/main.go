@@ -2,8 +2,8 @@
 //
 // Smyklot automates PR approvals and merges based on CODEOWNERS permissions.
 // It reads environment variables from GitHub Actions and executes commands
-// (/approve, @smyklot approve, approve, lgtm, merge, unapprove) based on user
-// permissions defined in the .github/CODEOWNERS file.
+// (/approve, @smyklot approve, approve, lgtm, merge, unapprove, help) based on
+// user permissions defined in the .github/CODEOWNERS file.
 package main
 
 import (
@@ -262,6 +262,13 @@ func run(_ *cobra.Command, _ []string) error {
 		return NewInputError(ErrInvalidInput, runtimeConfig.CommentID, errInvalidComment)
 	}
 
+	// Handle help command immediately (no permission check needed)
+	for _, cmdType := range parsedCmd.Commands {
+		if cmdType == commands.CommandHelp {
+			return handleHelp(client, prNum, commentIDNum)
+		}
+	}
+
 	// Check if the user has permission to execute this command
 	canApprove, err := checker.CanApprove(runtimeConfig.CommentAuthor, rootPath)
 	if err != nil {
@@ -388,17 +395,13 @@ func postFeedback(
 	return nil
 }
 
-// addReaction adds a reaction to a comment.
-func addReaction(
-	client *github.Client,
-	commentID int,
-	reaction github.ReactionType,
-) error {
+// addEyesReaction adds an eyes reaction to a comment to acknowledge the command.
+func addEyesReaction(client *github.Client, commentID int) error {
 	if err := client.AddReaction(
 		runtimeConfig.RepoOwner,
 		runtimeConfig.RepoName,
 		commentID,
-		reaction,
+		github.ReactionEyes,
 	); err != nil {
 		return NewGitHubError(ErrAddReaction, err)
 	}
@@ -443,7 +446,7 @@ func handleUnauthorized(
 // handleApprove handles the /approve command.
 func handleApprove(client *github.Client, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
-	if err := addReaction(client, commentID, github.ReactionEyes); err != nil {
+	if err := addEyesReaction(client, commentID); err != nil {
 		return err
 	}
 
@@ -468,7 +471,7 @@ func handleApprove(client *github.Client, prNum, commentID int) error {
 // handleMerge handles the /merge command.
 func handleMerge(client *github.Client, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
-	if err := addReaction(client, commentID, github.ReactionEyes); err != nil {
+	if err := addEyesReaction(client, commentID); err != nil {
 		return err
 	}
 
@@ -511,7 +514,7 @@ func handleMerge(client *github.Client, prNum, commentID int) error {
 // handleUnapprove handles the /unapprove command.
 func handleUnapprove(client *github.Client, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
-	if err := addReaction(client, commentID, github.ReactionEyes); err != nil {
+	if err := addEyesReaction(client, commentID); err != nil {
 		return err
 	}
 
@@ -529,6 +532,19 @@ func handleUnapprove(client *github.Client, prNum, commentID int) error {
 
 	// Post-success feedback
 	fb := feedback.NewUnapproveSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
+
+	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+}
+
+// handleHelp handles the /help command.
+func handleHelp(client *github.Client, prNum, commentID int) error {
+	// Add eyes reaction to acknowledge
+	if err := addEyesReaction(client, commentID); err != nil {
+		return err
+	}
+
+	// Post help feedback
+	fb := feedback.NewHelp()
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }

@@ -681,5 +681,40 @@ m`
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 		})
+
+		Context("when parsing help command", func() {
+			It("should parse /help command", func() {
+				cmd, err := commands.ParseCommand("/help", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandHelp))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse @smyklot help command", func() {
+				cmd, err := commands.ParseCommand("@smyklot help", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandHelp))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse bare help command", func() {
+				cmd, err := commands.ParseCommand("help", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandHelp))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should not contradict with other commands", func() {
+				cmd, err := commands.ParseCommand("approve help", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands).To(ContainElement(commands.CommandApprove))
+				Expect(cmd.Commands).To(ContainElement(commands.CommandHelp))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+		})
 	})
 })

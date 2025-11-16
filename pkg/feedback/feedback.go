@@ -293,6 +293,40 @@ func NewUnapproveFailed(reason string) *Feedback {
 	}
 }
 
+// NewHelp creates help feedback with usage instructions
+func NewHelp() *Feedback {
+	message := "ℹ️ **Smyklot Bot - Help**\n\n" +
+		"I can help you manage pull requests through simple commands.\n\n" +
+		"**Available Commands:**\n\n" +
+		"**Approval Commands:**\n" +
+		"- `/approve` or `@smyklot approve` or `approve` - Approve the PR\n" +
+		"- `accept` or `lgtm` - Alternative ways to approve\n\n" +
+		"**Merge Commands:**\n" +
+		"- `/merge` or `@smyklot merge` or `merge` - Merge the PR\n\n" +
+		"**Review Management:**\n" +
+		"- `/unapprove` or `@smyklot unapprove` or `unapprove` - Dismiss your approval\n" +
+		"- `disapprove` - Alternative way to unapprove\n\n" +
+		"**Help:**\n" +
+		"- `/help` or `@smyklot help` or `help` - Show this help message\n\n" +
+		"**Command Formats:**\n" +
+		"- **Slash commands**: `/approve`, `/merge`, `/help`\n" +
+		"- **Mention commands**: `@smyklot approve`, `@smyklot merge`\n" +
+		"- **Bare commands**: `approve`, `lgtm`, `merge`, `help`\n\n" +
+		"**Multiple Commands:**\n" +
+		"You can use multiple commands in one comment:\n" +
+		"```\napprove\nmerge\n```\n" +
+		"or `approve merge`\n\n" +
+		"**Permissions:**\n" +
+		"Only users listed in `.github/CODEOWNERS` can execute commands.\n\n" +
+		"**Note:** All commands are case-insensitive."
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "ℹ️",
+		Message: message,
+	}
+}
+
 // String returns a string representation of the feedback
 //
 // For success: Returns emoji only

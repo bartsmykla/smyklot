@@ -13,6 +13,9 @@ const (
 	// CommandUnapprove represents the unapprove command
 	CommandUnapprove CommandType = "unapprove"
 
+	// CommandHelp represents the help command
+	CommandHelp CommandType = "help"
+
 	// CommandUnknown represents an unknown or invalid command
 	CommandUnknown CommandType = "unknown"
 )
