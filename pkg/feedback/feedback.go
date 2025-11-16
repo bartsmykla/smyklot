@@ -490,59 +490,15 @@ func CombineFeedback(feedbacks []*Feedback, quietSuccess bool) *Feedback {
 		return feedbacks[0]
 	}
 
-	// Count feedback types
-	var successCount, errorCount, warningCount int
-	var messages []string
-
-	for _, f := range feedbacks {
-		switch f.Type {
-		case Success:
-			successCount++
-			// Only include success messages if not quietSuccess
-			if !quietSuccess && f.Message != "" {
-				messages = append(messages, f.Message)
-			}
-		case Error:
-			errorCount++
-			if f.Message != "" {
-				messages = append(messages, f.Message)
-			}
-		case Warning:
-			warningCount++
-			if f.Message != "" {
-				messages = append(messages, f.Message)
-			}
-		}
-	}
+	// Count feedback types and collect messages
+	counts := countFeedbackTypes(feedbacks)
+	messages := collectMessages(feedbacks, quietSuccess)
 
 	// Determine overall type and emoji
-	var feedbackType Type
-	var emoji string
-
-	if errorCount > 0 && successCount == 0 && warningCount == 0 {
-		// All errors
-		feedbackType = Error
-		emoji = "❌"
-	} else if errorCount == 0 && successCount > 0 && warningCount == 0 {
-		// All success
-		feedbackType = Success
-		emoji = "✅"
-	} else {
-		// Mixed results (partial success)
-		feedbackType = Warning
-		emoji = "😕"
-	}
+	feedbackType, emoji := determineFeedbackType(counts)
 
 	// Combine messages
-	var combinedMessage string
-	if len(messages) > 0 {
-		// Add header for mixed results
-		if feedbackType == Warning {
-			combinedMessage = "**Partial Success**\n\n" + strings.Join(messages, "\n\n---\n\n")
-		} else {
-			combinedMessage = strings.Join(messages, "\n\n---\n\n")
-		}
-	}
+	combinedMessage := combineMessages(messages, feedbackType)
 
 	// For all-success with quietSuccess, don't include message
 	if feedbackType == Success && quietSuccess {
@@ -554,4 +510,69 @@ func CombineFeedback(feedbacks []*Feedback, quietSuccess bool) *Feedback {
 		Emoji:   emoji,
 		Message: combinedMessage,
 	}
+}
+
+// feedbackCounts holds counts of each feedback type
+type feedbackCounts struct {
+	success int
+	error   int
+	warning int
+}
+
+// countFeedbackTypes counts each type of feedback
+func countFeedbackTypes(feedbacks []*Feedback) feedbackCounts {
+	var counts feedbackCounts
+	for _, f := range feedbacks {
+		switch f.Type {
+		case Success:
+			counts.success++
+		case Error:
+			counts.error++
+		case Warning:
+			counts.warning++
+		}
+	}
+	return counts
+}
+
+// collectMessages collects non-empty messages from feedbacks
+func collectMessages(feedbacks []*Feedback, quietSuccess bool) []string {
+	var messages []string
+	for _, f := range feedbacks {
+		if f.Message == "" {
+			continue
+		}
+		// Skip success messages if quietSuccess is enabled
+		if f.Type == Success && quietSuccess {
+			continue
+		}
+		messages = append(messages, f.Message)
+	}
+	return messages
+}
+
+// determineFeedbackType determines overall feedback type and emoji
+func determineFeedbackType(counts feedbackCounts) (Type, string) {
+	// All errors
+	if counts.error > 0 && counts.success == 0 && counts.warning == 0 {
+		return Error, "❌"
+	}
+	// All success
+	if counts.error == 0 && counts.success > 0 && counts.warning == 0 {
+		return Success, "✅"
+	}
+	// Mixed results (partial success)
+	return Warning, "😕"
+}
+
+// combineMessages combines multiple messages into one
+func combineMessages(messages []string, feedbackType Type) string {
+	if len(messages) == 0 {
+		return ""
+	}
+	separator := "\n\n---\n\n"
+	if feedbackType == Warning {
+		return "**Partial Success**\n\n" + strings.Join(messages, separator)
+	}
+	return strings.Join(messages, separator)
 }

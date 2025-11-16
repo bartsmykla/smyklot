@@ -532,6 +532,8 @@ func handleUnauthorized(
 
 // handleApprove handles the /approve command.
 // executeApprove executes the approve command and returns feedback
+//
+//nolint:unparam // error return kept for consistent function signature
 func executeApprove(client *github.Client, prNum int) (*feedback.Feedback, error) {
 	// Get PR info to check existing approvals
 	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
@@ -557,6 +559,8 @@ func executeApprove(client *github.Client, prNum int) (*feedback.Feedback, error
 }
 
 // executeMerge executes the merge command with specified method and returns feedback
+//
+//nolint:unparam // error return kept for consistent function signature
 func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (*feedback.Feedback, error) {
 	// Get PR info to check if it's mergeable
 	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
@@ -588,6 +592,8 @@ func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (
 }
 
 // executeUnapprove executes the unapprove command and returns feedback
+//
+//nolint:unparam // error return kept for consistent function signature
 func executeUnapprove(client *github.Client, prNum int) (*feedback.Feedback, error) {
 	// Dismiss the review
 	if err := client.DismissReview(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
@@ -601,6 +607,8 @@ func executeUnapprove(client *github.Client, prNum int) (*feedback.Feedback, err
 //
 // Cleanup removes all bot reactions, approvals, and comments from the PR,
 // then deletes the triggering comment.
+//
+//nolint:unparam // error return kept for consistent function signature
 func executeCleanup(client *github.Client, prNum, commentID int) (*feedback.Feedback, error) {
 	// Get authenticated user (bot) to identify bot's comments
 	botUsername, err := client.GetAuthenticatedUser()
