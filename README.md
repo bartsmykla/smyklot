@@ -10,7 +10,10 @@ Smyklot is a GitHub App that automates pull request approvals and merges by vali
 
 - **CODEOWNERS-based permissions** - Only repository owners defined in `.github/CODEOWNERS` can approve/merge
 - **Multiple command formats** - Supports slash commands (`/approve`), mentions (`@smyklot approve`), and bare commands (`lgtm`, `merge`)
-- **Reaction-based commands** - Use 👍 to approve or 🚀 to merge
+- **Merge method control** - Explicit `squash` and `rebase` commands with intelligent fallback for `merge`
+- **Reaction-based commands** - Use 👍 to approve, 🚀 to merge, or ❤️ to cleanup
+- **Cleanup command** - Remove all bot reactions, approvals, and comments with a single command
+- **Approval deduplication** - Prevents duplicate approvals with smart reaction handling
 - **Flexible configuration** - Configure via `SMYKLOT_CONFIG` JSON, individual variables, or environment variables
 - **Emoji feedback** - Get instant visual confirmation with ✅ (success), ❌ (error), or ⚠️ (warning)
 - **Comment edit/delete handling** - Reacts to command edits and removes reactions when commands are deleted
@@ -57,15 +60,18 @@ Smyklot responds to these commands in PR comments:
 | Command | Aliases | Format | Description |
 |---------|---------|--------|-------------|
 | `approve` | `lgtm`, `accept` | `/approve`, `@smyklot approve`, `approve` | Approve the pull request |
-| `merge` | - | `/merge`, `@smyklot merge`, `merge` | Merge the pull request |
+| `merge` | - | `/merge`, `@smyklot merge`, `merge` | Merge the pull request (with fallback) |
+| `squash` | - | `/squash`, `@smyklot squash`, `squash` | Squash merge the pull request |
+| `rebase` | - | `/rebase`, `@smyklot rebase`, `rebase` | Rebase merge the pull request |
 | `unapprove` | - | `/unapprove`, `@smyklot unapprove` | Remove approval |
+| `cleanup` | - | `/cleanup`, `@smyklot cleanup`, `cleanup` | Remove all bot reactions, approvals, and comments |
 | `help` | - | `/help`, `@smyklot help` | Show help information |
 
 **Command Formats**:
 
-- **Slash commands**: `/approve`, `/merge`, `/unapprove`, `/help`
-- **Mention commands**: `@smyklot approve`, `@smyklot merge`, `@smyklot unapprove`
-- **Bare commands**: `approve`, `accept`, `lgtm`, `merge` (exact match only)
+- **Slash commands**: `/approve`, `/merge`, `/squash`, `/rebase`, `/unapprove`, `/cleanup`, `/help`
+- **Mention commands**: `@smyklot approve`, `@smyklot merge`, `@smyklot squash`, `@smyklot rebase`, `@smyklot unapprove`, `@smyklot cleanup`
+- **Bare commands**: `approve`, `accept`, `lgtm`, `merge`, `squash`, `rebase`, `cleanup` (exact match only)
 
 All commands are case-insensitive.
 
@@ -75,6 +81,7 @@ All commands are case-insensitive.
 |----------|--------|
 | 👍 | Approve the pull request |
 | 🚀 | Merge the pull request |
+| ❤️ | Cleanup (remove all bot reactions, approvals, and comments) |
 
 **Note**: Removing a reaction will automatically undo the corresponding action (remove approval/merge labels).
 
@@ -117,11 +124,25 @@ Or simply add a 👍 reaction to any comment.
 
 #### Merging a PR
 
+Merge with default method (with fallback to squash/rebase if merge commits disallowed):
+
 ```text
 /merge
 ```
 
 Or add a 🚀 reaction to any comment.
+
+#### Squash Merging
+
+```text
+/squash
+```
+
+#### Rebase Merging
+
+```text
+/rebase
+```
 
 #### Removing Approval
 
@@ -130,6 +151,18 @@ Or add a 🚀 reaction to any comment.
 ```
 
 Or remove your 👍 reaction.
+
+#### Cleanup
+
+Remove all bot reactions, approvals, and comments:
+
+```text
+/cleanup
+```
+
+Or add a ❤️ reaction to any comment.
+
+**Note**: Cleanup cannot be combined with other commands.
 
 ## Configuration
 
@@ -257,10 +290,13 @@ env:
 3. `pr-commands.yml` workflow starts
 4. Smyklot:
    - Parses the command (supports slash, mention, and bare formats)
-   - Or processes reactions (👍 for approve, 🚀 for merge)
+   - Or processes reactions (👍 for approve, 🚀 for merge, ❤️ for cleanup)
+   - Validates command combinations (cleanup cannot be combined with others)
+   - Checks for duplicate approvals (prevents re-approving)
    - Fetches `.github/CODEOWNERS` via GitHub API
    - Checks user permissions
-   - Calls GitHub API to approve/merge
+   - Calls GitHub API to approve/merge/cleanup
+   - For merge: tries specified method or falls back (merge → squash → rebase)
    - Posts reactions and feedback
 5. On comment edit/delete or reaction removal, updates accordingly
 
@@ -384,7 +420,11 @@ Current test coverage: 130+ tests passing
 
 - [x] Command parser (slash, mention, bare)
 - [x] Multi-command support
-- [x] Reaction-based approvals/merges (👍, 🚀)
+- [x] Merge method commands (merge, squash, rebase)
+- [x] Merge method fallback (merge → squash → rebase)
+- [x] Cleanup command (remove all bot reactions, approvals, comments)
+- [x] Approval deduplication (prevent duplicate approvals)
+- [x] Reaction-based approvals/merges/cleanup (👍, 🚀, ❤️)
 - [x] Reaction removal tracking
 - [x] Comment edit/delete handling
 - [x] CODEOWNERS parser (global owners)

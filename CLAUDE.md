@@ -5,8 +5,9 @@ This file provides guidance to Claude Code when working with this repository.
 ## Project Overview
 
 Smyklot is a GitHub App for automated PR approvals and merges based on
-CODEOWNERS files. It supports comment-based commands and reaction-based
-approvals (👍/🚀). Built in Go using TDD methodology with Ginkgo/Gomega.
+CODEOWNERS files. It supports comment-based commands, merge method control,
+cleanup operations, and reaction-based approvals (👍/🚀/❤️). Built in Go
+using TDD methodology with Ginkgo/Gomega.
 
 **Current Status**: Phase 1 complete (Docker-based GitHub Action)
 **Test Coverage**: 130+ tests passing
@@ -46,12 +47,14 @@ smyklot/
 #### `pkg/commands`
 
 - Parses commands from PR comments
-- **Commands**: `approve` (aliases: `lgtm`, `accept`), `merge`, `unapprove`, `help`
+- **Commands**: `approve` (aliases: `lgtm`, `accept`), `merge`, `squash`, `rebase`, `unapprove`, `cleanup`, `help`
 - **Formats**: Slash (`/approve`), mention (`@smyklot approve`), bare (`lgtm`, `merge`)
 - **Multi-command support**: Parse multiple commands in single comment
+- **Command validation**: Prevents cleanup from being combined with other commands
+- **Approval deduplication**: Checks existing approvals to prevent duplicates
 - **Configurable**: Custom aliases, prefix, disable specific formats
 - Returns `Command` type with parsed actions
-- 52+ tests covering all parsing scenarios including multi-command
+- 78+ tests covering all parsing scenarios including multi-command
 
 #### `pkg/permissions`
 
@@ -78,9 +81,11 @@ smyklot/
 #### `pkg/github`
 
 - GitHub API client
-- **Methods**: `AddReaction`, `RemoveReaction`, `PostComment`, `ApprovePR`,
-  `MergePR`, `GetPRInfo`, `GetCodeowners`, `GetCommentReactions`, `GetLabels`
-- **Reaction support**: 👍 (approve), 🚀 (merge), with removal tracking
+- **Methods**: `AddReaction`, `RemoveReaction`, `PostComment`, `DeleteComment`,
+  `ApprovePR`, `DismissReview`, `MergePR`, `GetPRInfo`, `GetPRComments`,
+  `GetCodeowners`, `GetCommentReactions`, `GetLabels`, `GetAuthenticatedUser`
+- **Merge methods**: Supports merge, squash, and rebase with fallback logic
+- **Reaction support**: 👍 (approve), 🚀 (merge), ❤️ (cleanup) with removal tracking
 - Uses GitHub App token from environment
 - 18+ tests with httptest mocking
 
@@ -206,9 +211,13 @@ Steps:
 **Completed**:
 
 - [x] Command parser (slash, mention, bare formats)
-- [x] Commands: `approve`, `merge`, `unapprove`, `help` with aliases
+- [x] Commands: `approve`, `merge`, `squash`, `rebase`, `unapprove`, `cleanup`, `help` with aliases
+- [x] Merge method control (explicit squash/rebase with fallback)
+- [x] Cleanup command (remove all bot reactions, approvals, comments)
+- [x] Approval deduplication (prevent duplicate approvals)
 - [x] Multi-command support (multiple commands in single comment)
-- [x] Reaction-based approvals/merges (👍 approve, 🚀 merge)
+- [x] Command validation (cleanup cannot be combined with others)
+- [x] Reaction-based approvals/merges/cleanup (👍 approve, 🚀 merge, ❤️ cleanup)
 - [x] Reaction removal tracking (auto-remove approvals/merges)
 - [x] Comment edit/delete handling
 - [x] CODEOWNERS parser (global owners only)
