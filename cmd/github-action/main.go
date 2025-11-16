@@ -318,13 +318,9 @@ func run(_ *cobra.Command, _ []string) error {
 		return handleUnauthorized(client, checker, prNum, commentIDNum)
 	}
 
-	// Add eyes reaction to acknowledge command
-	if err := addEyesReaction(client, commentIDNum); err != nil {
-		return err
-	}
-
 	// Execute all commands and collect feedback
 	var feedbacks []*feedback.Feedback
+	isNewComment := runtimeConfig.CommentAction == "created" || runtimeConfig.CommentAction == ""
 
 	for _, cmdType := range parsedCmd.Commands {
 		var fb *feedback.Feedback
@@ -346,7 +342,28 @@ func run(_ *cobra.Command, _ []string) error {
 			return err
 		}
 
+		// For new comments, filter out "already approved" warnings
+		// Just acknowledge with eyes reaction instead
+		if isNewComment && fb.Type == feedback.Warning &&
+			fb.Message != "" && strings.Contains(fb.Message, "Already Approved") {
+			// Add eyes reaction to acknowledge (user already approved)
+			if err := addEyesReaction(client, commentIDNum); err != nil {
+				return err
+			}
+			continue
+		}
+
 		feedbacks = append(feedbacks, fb)
+	}
+
+	// If no actionable feedback (e.g., only "already approved" for new comment), return early
+	if len(feedbacks) == 0 {
+		return nil
+	}
+
+	// Add eyes reaction to acknowledge command execution
+	if err := addEyesReaction(client, commentIDNum); err != nil {
+		return err
 	}
 
 	// Combine all feedback and post once
@@ -498,6 +515,21 @@ func handleUnauthorized(
 // handleApprove handles the /approve command.
 // executeApprove executes the approve command and returns feedback
 func executeApprove(client *github.Client, prNum int) (*feedback.Feedback, error) {
+	// Get PR info to check existing approvals
+	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	if err != nil {
+		return feedback.NewApprovalFailed(err.Error()), nil
+	}
+
+	// Check if already approved by the comment author
+	for _, approver := range info.ApprovedBy {
+		if approver == runtimeConfig.CommentAuthor {
+			// Already approved - return feedback indicating no action needed
+			// This will be filtered out in the main loop for new comments
+			return feedback.NewAlreadyApproved(runtimeConfig.CommentAuthor), nil
+		}
+	}
+
 	// Approve the PR
 	if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
 		return feedback.NewApprovalFailed(err.Error()), nil
