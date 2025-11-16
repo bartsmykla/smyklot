@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -107,11 +108,11 @@ func getPollConfig(cmd *cobra.Command) (string, string, error) {
 
 // parseRepo parses owner and name from repo string
 func parseRepo(repo string) (string, string, error) {
-	var repoOwner, repoName string
-	if _, err := fmt.Sscanf(repo, "%[^/]/%s", &repoOwner, &repoName); err != nil {
-		return "", "", fmt.Errorf("invalid repository format (expected owner/name): %w", err)
+	parts := strings.Split(repo, "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("invalid repository format (expected owner/name, got %q)", repo)
 	}
-	return repoOwner, repoName, nil
+	return parts[0], parts[1], nil
 }
 
 // setupPollClients creates GitHub client and permission checker
