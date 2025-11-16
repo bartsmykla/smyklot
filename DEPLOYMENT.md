@@ -26,7 +26,7 @@ Path-specific patterns will be supported in Phase 2.
 
 ### 2. Create Workflow File
 
-Create `.github/workflows/pr-commands.yml`:
+Create `.github/workflows/pr-commands.yaml`:
 
 Smyklot supports two ways to pass parameters:
 
@@ -195,7 +195,7 @@ separately.
 ### 4. Commit and Push
 
 ```bash
-git add .github/CODEOWNERS .github/workflows/pr-commands.yml
+git add .github/CODEOWNERS .github/workflows/pr-commands.yaml
 git commit -sS -m "feat(ci): add Smyklot PR command automation"
 git push
 ```
@@ -250,7 +250,7 @@ Create a test pull request and try the commands:
 2. **Check workflow file exists**:
 
    ```bash
-   cat .github/workflows/pr-commands.yml
+   cat .github/workflows/pr-commands.yaml
    ```
 
 3. **Check Actions tab**:
@@ -324,7 +324,7 @@ To update to a new version:
 2. Commit and push:
 
    ```bash
-   git add .github/workflows/pr-commands.yml
+   git add .github/workflows/pr-commands.yaml
    git commit -sS -m "chore(ci): update Smyklot to v1.0.0"
    git push
    ```

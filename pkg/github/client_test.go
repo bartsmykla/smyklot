@@ -272,7 +272,8 @@ var _ = Describe("GitHub Client [Unit]", func() {
 					Expect(r.Header.Get("Authorization")).To(Equal("token test-token"))
 
 					// Handle both PR info and reviews requests
-					if r.URL.Path == "/repos/owner/repo/pulls/1" {
+					switch r.URL.Path {
+					case "/repos/owner/repo/pulls/1":
 						w.WriteHeader(http.StatusOK)
 						_ = json.NewEncoder(w).Encode(map[string]interface{}{
 							"number":    1,
@@ -284,7 +285,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 								"login": "testuser",
 							},
 						})
-					} else if r.URL.Path == "/repos/owner/repo/pulls/1/reviews" {
+					case "/repos/owner/repo/pulls/1/reviews":
 						w.WriteHeader(http.StatusOK)
 						_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 							{
@@ -294,7 +295,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 								},
 							},
 						})
-					} else {
+					default:
 						Fail("unexpected request path: " + r.URL.Path)
 					}
 				}))

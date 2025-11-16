@@ -48,7 +48,7 @@ Smyklot is a GitHub App that automates pull request approvals and merges by vali
 Copy the workflow file to your repository:
 
 ```bash
-cp .github/workflows/pr-commands.yml your-repo/.github/workflows/
+cp .github/workflows/pr-commands.yaml your-repo/.github/workflows/
 ```
 
 ## Usage
@@ -287,12 +287,12 @@ env:
 
 1. User comments a command or adds a reaction on a PR
 2. GitHub triggers `issue_comment` webhook
-3. `pr-commands.yml` workflow starts
+3. `pr-commands.yaml` workflow starts
 4. Smyklot:
    - Parses the command (supports slash, mention, and bare formats)
    - Or processes reactions (👍 for approve, 🚀 for merge, ❤️ for cleanup)
    - Validates command combinations (cleanup cannot be combined with others)
-   - Checks for duplicate approvals (prevents re-approving)
+   - Checks for duplicate approvals (prevents re-approving for both commands and reactions)
    - Fetches `.github/CODEOWNERS` via GitHub API
    - Checks user permissions
    - Calls GitHub API to approve/merge/cleanup

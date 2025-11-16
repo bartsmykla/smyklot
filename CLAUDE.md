@@ -84,8 +84,10 @@ smyklot/
 - **Methods**: `AddReaction`, `RemoveReaction`, `PostComment`, `DeleteComment`,
   `ApprovePR`, `DismissReview`, `MergePR`, `GetPRInfo`, `GetPRComments`,
   `GetCodeowners`, `GetCommentReactions`, `GetLabels`, `GetAuthenticatedUser`
+- **GetPRInfo**: Fetches PR data and populates `ApprovedBy` from reviews
 - **Merge methods**: Supports merge, squash, and rebase with fallback logic
 - **Reaction support**: 👍 (approve), 🚀 (merge), ❤️ (cleanup) with removal tracking
+- **Approval deduplication**: Both command and reaction handlers check existing approvals
 - Uses GitHub App token from environment
 - 18+ tests with httptest mocking
 
@@ -163,7 +165,9 @@ Follow global `CLAUDE.md` Go style with these specifics:
 
 ## GitHub Actions Workflows
 
-### `test.yml`
+**Note**: All workflow files use `.yaml` extension (not `.yml`) for consistency.
+
+### `test.yaml`
 
 Runs on: push to `main`, `feat/**`, and PRs
 
@@ -175,9 +179,11 @@ Steps:
 4. Run linters (`golangci-lint-action@v9.0.0`)
 5. Verify modules (`go mod verify`)
 
-### `pr-commands.yml`
+### `pr-commands.yaml`
 
 Triggered by: `issue_comment` on PRs
+
+Uses: Local action reference (`uses: ./`) for latest version
 
 Environment variables (from GitHub context):
 
@@ -191,10 +197,9 @@ Environment variables (from GitHub context):
 
 Steps:
 
-1. Checkout code
-2. Install mise
-3. Build binary: `go build -o bin/smyklot-github-action ./cmd/github-action`
-4. Execute binary with environment variables
+1. Checkout full repository
+2. Run local action (builds and executes binary)
+3. Action uses environment variables for all inputs
 
 ### Security Practices
 
@@ -214,11 +219,12 @@ Steps:
 - [x] Commands: `approve`, `merge`, `squash`, `rebase`, `unapprove`, `cleanup`, `help` with aliases
 - [x] Merge method control (explicit squash/rebase with fallback)
 - [x] Cleanup command (remove all bot reactions, approvals, comments)
-- [x] Approval deduplication (prevent duplicate approvals)
+- [x] Approval deduplication (prevent duplicate approvals for both commands and reactions)
 - [x] Multi-command support (multiple commands in single comment)
 - [x] Command validation (cleanup cannot be combined with others)
 - [x] Reaction-based approvals/merges/cleanup (👍 approve, 🚀 merge, ❤️ cleanup)
 - [x] Reaction removal tracking (auto-remove approvals/merges)
+- [x] Reaction-based approval deduplication (GetPRInfo populates ApprovedBy)
 - [x] Comment edit/delete handling
 - [x] CODEOWNERS parser (global owners only)
 - [x] CODEOWNERS API fetching (no repository checkout)

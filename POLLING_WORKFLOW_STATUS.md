@@ -12,7 +12,7 @@
 
 - Added `poll` subcommand to CLI (`cmd/github-action/poll.go`)
 - Added `GetOpenPRs()` method to GitHub client
-- Created `.github/workflows/poll-reactions.yml` workflow
+- Created `.github/workflows/poll-reactions.yaml` workflow
 - Runs on schedule: `*/5 * * * *` (every 5 minutes)
 - Can be triggered manually via `workflow_dispatch`
 
@@ -20,7 +20,7 @@
 
 - `cmd/github-action/poll.go` - New poll subcommand
 - `pkg/github/client.go` - Added `GetOpenPRs()` method
-- `.github/workflows/poll-reactions.yml` - Scheduled workflow
+- `.github/workflows/poll-reactions.yaml` - Scheduled workflow
 
 **Deployed to**:
 
@@ -80,8 +80,8 @@
 
 **Files changed**:
 
-- `.github/workflows/poll-reactions.yml` - Use Docker image
-- `.github/workflows/pr-commands.yml` - Use Docker image
+- `.github/workflows/poll-reactions.yaml` - Use Docker image
+- `.github/workflows/pr-commands.yaml` - Use Docker image
 
 **Benefits**:
 

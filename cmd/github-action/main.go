@@ -1095,6 +1095,46 @@ func handleReactionApprove(
 	prNum, commentID int,
 	approver string,
 ) error {
+	// Get PR info to check existing approvals
+	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	if err != nil {
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewApprovalFailed,
+			ErrApprovePR,
+		)
+	}
+
+	// Get authenticated user (bot) to check if already approved
+	botUsername, err := client.GetAuthenticatedUser()
+	if err != nil {
+		return postOperationFailure(
+			client,
+			prNum,
+			commentID,
+			err,
+			feedback.NewApprovalFailed,
+			ErrApprovePR,
+		)
+	}
+
+	// Check if bot already approved the PR
+	for _, existingApprover := range info.ApprovedBy {
+		if existingApprover == botUsername {
+			// Already approved - skip approval but still add label
+			_ = client.AddLabel(
+				runtimeConfig.RepoOwner,
+				runtimeConfig.RepoName,
+				prNum,
+				github.LabelReactionApprove,
+			)
+			return nil
+		}
+	}
+
 	// Approve the PR
 	if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
 		return postOperationFailure(
