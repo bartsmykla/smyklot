@@ -55,7 +55,7 @@ dockers_v2:
       org.opencontainers.image.title: "{{.ProjectName}}"
       org.opencontainers.image.description: "Automated PR approvals and merges based on CODEOWNERS"
       org.opencontainers.image.url: "https://github.com/bartsmykla/smyklot"
-      org.opencontainers.image.source: "{{.GitURL}}"
+      org.opencontainers.image.source: "{{ trimsuffix .GitURL \".git\" }}"
       org.opencontainers.image.version: "{{.Version}}"
       org.opencontainers.image.created: "{{.Date}}"
       org.opencontainers.image.revision: "{{.FullCommit}}"
