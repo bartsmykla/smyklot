@@ -170,6 +170,101 @@ Thanks for the PR!`
 			})
 		})
 
+		Context("when parsing bare commands", func() {
+			It("should parse 'approve' as bare command", func() {
+				cmd, err := commands.ParseCommand("approve", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+				Expect(cmd.Raw).To(Equal("approve"))
+			})
+
+			It("should parse 'accept' as bare command", func() {
+				cmd, err := commands.ParseCommand("accept", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse 'lgtm' as bare command", func() {
+				cmd, err := commands.ParseCommand("lgtm", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse 'merge' as bare command", func() {
+				cmd, err := commands.ParseCommand("merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should handle bare commands with leading whitespace", func() {
+				cmd, err := commands.ParseCommand("  approve", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should handle bare commands with trailing whitespace", func() {
+				cmd, err := commands.ParseCommand("merge  ", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should be case-insensitive for bare commands", func() {
+				cmd, err := commands.ParseCommand("APPROVE", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+
+				cmd, err = commands.ParseCommand("LGTM", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should NOT parse bare commands with extra text before", func() {
+				cmd, err := commands.ParseCommand("please approve", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandUnknown))
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should NOT parse bare commands with extra text after", func() {
+				cmd, err := commands.ParseCommand("approve this", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandUnknown))
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should prioritize slash commands over bare commands", func() {
+				cfg := config.Default()
+				cfg.CommandPrefix = "/"
+
+				cmd, err := commands.ParseCommand("/merge", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should prioritize mention commands over bare commands", func() {
+				cmd, err := commands.ParseCommand("@smyklot approve", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should work with bare commands when slash and mention commands fail", func() {
+				cmd, err := commands.ParseCommand("lgtm", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+		})
+
 		Context("with custom configuration", func() {
 			It("should use a custom command prefix", func() {
 				cfg := config.Default()
@@ -254,6 +349,63 @@ Thanks for the PR!`
 				cfg.AllowedCommands = []string{"approve"}
 
 				cmd, err := commands.ParseCommand("!app", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should resolve aliases for bare commands", func() {
+				cfg := config.Default()
+				cfg.CommandAliases = map[string]string{
+					"ok": "approve",
+				}
+
+				cmd, err := commands.ParseCommand("ok", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should respect allowed commands for bare commands", func() {
+				cfg := config.Default()
+				cfg.AllowedCommands = []string{"approve"}
+
+				cmd, err := commands.ParseCommand("approve", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+
+				cmd, err = commands.ParseCommand("merge", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandUnknown))
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should disable bare commands when configured", func() {
+				cfg := config.Default()
+				cfg.DisableBareCommands = true
+
+				cmd, err := commands.ParseCommand("approve", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandUnknown))
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should still parse slash commands when bare commands are disabled", func() {
+				cfg := config.Default()
+				cfg.DisableBareCommands = true
+
+				cmd, err := commands.ParseCommand("/approve", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should still parse mention commands when bare commands are disabled", func() {
+				cfg := config.Default()
+				cfg.DisableBareCommands = true
+
+				cmd, err := commands.ParseCommand("@smyklot approve", cfg)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(cmd.Type).To(Equal(commands.CommandApprove))
 				Expect(cmd.IsValid).To(BeTrue())

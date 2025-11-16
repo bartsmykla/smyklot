@@ -2,8 +2,8 @@
 //
 // Smyklot automates PR approvals and merges based on CODEOWNERS permissions.
 // It reads environment variables from GitHub Actions and executes commands
-// like /approve and /merge based on user permissions defined in the
-// .github/CODEOWNERS file.
+// (/approve, @smyklot approve, approve, lgtm, merge) based on user permissions
+// defined in the .github/CODEOWNERS file.
 package main
 
 import (
@@ -80,6 +80,7 @@ const (
 | Quiet Success | ` + "`{{.QuietSuccess}}`" + ` |
 | Command Prefix | ` + "`{{.CommandPrefix}}`" + ` |
 | Disable Mentions | ` + "`{{.DisableMentions}}`" + ` |
+| Disable Bare Commands | ` + "`{{.DisableBareCommands}}`" + ` |
 {{if .AllowedCommands}}| Allowed Commands | ` + "`{{.AllowedCommands}}`" + ` |
 {{else}}| Allowed Commands | All commands allowed |
 {{end}}
@@ -109,20 +110,21 @@ type RuntimeConfig struct {
 
 // stepSummaryData holds data for the step summary template.
 type stepSummaryData struct {
-	RepoOwner       string
-	RepoName        string
-	PRNumber        string
-	CommentID       string
-	CommentAuthor   string
-	CommentBody     string
-	GitHubApp       bool
-	AppID           string
-	InstallationID  string
-	QuietSuccess    bool
-	CommandPrefix   string
-	DisableMentions bool
-	AllowedCommands string
-	CommandAliases  map[string]string
+	RepoOwner           string
+	RepoName            string
+	PRNumber            string
+	CommentID           string
+	CommentAuthor       string
+	CommentBody         string
+	GitHubApp           bool
+	AppID               string
+	InstallationID      string
+	QuietSuccess        bool
+	CommandPrefix       string
+	DisableMentions     bool
+	DisableBareCommands bool
+	AllowedCommands     string
+	CommandAliases      map[string]string
 }
 
 var (
@@ -138,7 +140,8 @@ var rootCmd = &cobra.Command{
 and merges based on CODEOWNERS permissions.
 
 It reads environment variables from GitHub Actions and executes
-commands like /approve and /merge based on user permissions.`,
+commands (/approve, @smyklot approve, approve, lgtm, merge) based
+on user permissions.`,
 	RunE: run,
 }
 
@@ -166,6 +169,7 @@ func init() {
 	rootCmd.Flags().StringToString(config.KeyCommandAliases, map[string]string{}, "Command aliases (JSON)")
 	rootCmd.Flags().String(config.KeyCommandPrefix, config.DefaultCommandPrefix, "Command prefix")
 	rootCmd.Flags().Bool(config.KeyDisableMentions, false, "Disable mention-style commands")
+	rootCmd.Flags().Bool(config.KeyDisableBareCommands, false, "Disable bare commands")
 
 	// Bind flags to Viper
 	bindViperFlags([]string{
@@ -174,6 +178,7 @@ func init() {
 		config.KeyCommandAliases,
 		config.KeyCommandPrefix,
 		config.KeyDisableMentions,
+		config.KeyDisableBareCommands,
 	})
 }
 
@@ -573,20 +578,21 @@ func writeStepSummary() error {
 	}
 
 	data := stepSummaryData{
-		RepoOwner:       runtimeConfig.RepoOwner,
-		RepoName:        runtimeConfig.RepoName,
-		PRNumber:        runtimeConfig.PRNumber,
-		CommentID:       runtimeConfig.CommentID,
-		CommentAuthor:   runtimeConfig.CommentAuthor,
-		CommentBody:     runtimeConfig.CommentBody,
-		GitHubApp:       runtimeConfig.GitHubAppPrivateKey != "",
-		AppID:           runtimeConfig.GitHubAppID,
-		InstallationID:  runtimeConfig.InstallationID,
-		QuietSuccess:    botConfig.QuietSuccess,
-		CommandPrefix:   botConfig.CommandPrefix,
-		DisableMentions: botConfig.DisableMentions,
-		AllowedCommands: allowedCommands,
-		CommandAliases:  botConfig.CommandAliases,
+		RepoOwner:           runtimeConfig.RepoOwner,
+		RepoName:            runtimeConfig.RepoName,
+		PRNumber:            runtimeConfig.PRNumber,
+		CommentID:           runtimeConfig.CommentID,
+		CommentAuthor:       runtimeConfig.CommentAuthor,
+		CommentBody:         runtimeConfig.CommentBody,
+		GitHubApp:           runtimeConfig.GitHubAppPrivateKey != "",
+		AppID:               runtimeConfig.GitHubAppID,
+		InstallationID:      runtimeConfig.InstallationID,
+		QuietSuccess:        botConfig.QuietSuccess,
+		CommandPrefix:       botConfig.CommandPrefix,
+		DisableMentions:     botConfig.DisableMentions,
+		DisableBareCommands: botConfig.DisableBareCommands,
+		AllowedCommands:     allowedCommands,
+		CommandAliases:      botConfig.CommandAliases,
 	}
 
 	if err := tmpl.Execute(file, data); err != nil {

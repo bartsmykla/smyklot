@@ -27,6 +27,7 @@ var _ = Describe("Config [Unit]", func() {
 			Expect(cfg.CommandAliases).To(BeEmpty())
 			Expect(cfg.CommandPrefix).To(Equal("/"))
 			Expect(cfg.DisableMentions).To(BeFalse())
+			Expect(cfg.DisableBareCommands).To(BeFalse())
 		})
 	})
 
@@ -44,6 +45,7 @@ var _ = Describe("Config [Unit]", func() {
 			Expect(v.GetStringMapString(config.KeyCommandAliases)).To(BeEmpty())
 			Expect(v.GetString(config.KeyCommandPrefix)).To(Equal("/"))
 			Expect(v.GetBool(config.KeyDisableMentions)).To(BeFalse())
+			Expect(v.GetBool(config.KeyDisableBareCommands)).To(BeFalse())
 		})
 
 		It("should configure environment variable prefix", func() {
@@ -68,6 +70,7 @@ var _ = Describe("Config [Unit]", func() {
 			Expect(cfg.CommandAliases).To(BeEmpty())
 			Expect(cfg.CommandPrefix).To(Equal("/"))
 			Expect(cfg.DisableMentions).To(BeFalse())
+			Expect(cfg.DisableBareCommands).To(BeFalse())
 		})
 
 		It("should load from explicit settings", func() {
@@ -76,6 +79,7 @@ var _ = Describe("Config [Unit]", func() {
 			v.Set(config.KeyCommandAliases, map[string]string{"app": "approve"})
 			v.Set(config.KeyCommandPrefix, "!")
 			v.Set(config.KeyDisableMentions, true)
+			v.Set(config.KeyDisableBareCommands, true)
 
 			cfg := config.LoadFromViper(v)
 
@@ -84,17 +88,20 @@ var _ = Describe("Config [Unit]", func() {
 			Expect(cfg.CommandAliases).To(HaveKeyWithValue("app", "approve"))
 			Expect(cfg.CommandPrefix).To(Equal("!"))
 			Expect(cfg.DisableMentions).To(BeTrue())
+			Expect(cfg.DisableBareCommands).To(BeTrue())
 		})
 
 		It("should load from environment variables", func() {
 			Expect(os.Setenv("SMYKLOT_QUIET_SUCCESS", "true")).To(Succeed())
 			Expect(os.Setenv("SMYKLOT_COMMAND_PREFIX", "!")).To(Succeed())
 			Expect(os.Setenv("SMYKLOT_DISABLE_MENTIONS", "true")).To(Succeed())
+			Expect(os.Setenv("SMYKLOT_DISABLE_BARE_COMMANDS", "true")).To(Succeed())
 
 			defer func() {
 				_ = os.Unsetenv("SMYKLOT_QUIET_SUCCESS")
 				_ = os.Unsetenv("SMYKLOT_COMMAND_PREFIX")
 				_ = os.Unsetenv("SMYKLOT_DISABLE_MENTIONS")
+				_ = os.Unsetenv("SMYKLOT_DISABLE_BARE_COMMANDS")
 			}()
 
 			// Create a new viper instance to pick up env vars
@@ -106,6 +113,7 @@ var _ = Describe("Config [Unit]", func() {
 			Expect(cfg.QuietSuccess).To(BeTrue())
 			Expect(cfg.CommandPrefix).To(Equal("!"))
 			Expect(cfg.DisableMentions).To(BeTrue())
+			Expect(cfg.DisableBareCommands).To(BeTrue())
 		})
 
 		It("should load from JSON config", func() {
@@ -114,7 +122,8 @@ var _ = Describe("Config [Unit]", func() {
 				"allowed_commands": ["approve", "merge"],
 				"command_aliases": {"app": "approve", "a": "approve"},
 				"command_prefix": "!",
-				"disable_mentions": true
+				"disable_mentions": true,
+				"disable_bare_commands": true
 			}`
 
 			v.SetConfigType("json")
@@ -130,6 +139,7 @@ var _ = Describe("Config [Unit]", func() {
 			Expect(cfg.CommandAliases).To(HaveKeyWithValue("a", "approve"))
 			Expect(cfg.CommandPrefix).To(Equal("!"))
 			Expect(cfg.DisableMentions).To(BeTrue())
+			Expect(cfg.DisableBareCommands).To(BeTrue())
 		})
 
 		It("should respect precedence: explicit > env > config > default", func() {

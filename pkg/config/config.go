@@ -24,6 +24,9 @@ const (
 	// KeyDisableMentions is the config key for disable_mentions setting
 	KeyDisableMentions = "disable_mentions"
 
+	// KeyDisableBareCommands is the config key for disable_bare_commands setting
+	KeyDisableBareCommands = "disable_bare_commands"
+
 	// EnvPrefix is the prefix for environment variables
 	EnvPrefix = "SMYKLOT"
 )
@@ -36,6 +39,7 @@ func SetupViper(v *viper.Viper) {
 	v.SetDefault(KeyCommandAliases, map[string]string{})
 	v.SetDefault(KeyCommandPrefix, DefaultCommandPrefix)
 	v.SetDefault(KeyDisableMentions, false)
+	v.SetDefault(KeyDisableBareCommands, false)
 
 	// Enable environment variable support
 	v.SetEnvPrefix(EnvPrefix)
@@ -45,10 +49,11 @@ func SetupViper(v *viper.Viper) {
 // LoadFromViper creates a Config from Viper settings
 func LoadFromViper(v *viper.Viper) *Config {
 	return &Config{
-		QuietSuccess:    v.GetBool(KeyQuietSuccess),
-		AllowedCommands: v.GetStringSlice(KeyAllowedCommands),
-		CommandAliases:  v.GetStringMapString(KeyCommandAliases),
-		CommandPrefix:   v.GetString(KeyCommandPrefix),
-		DisableMentions: v.GetBool(KeyDisableMentions),
+		QuietSuccess:        v.GetBool(KeyQuietSuccess),
+		AllowedCommands:     v.GetStringSlice(KeyAllowedCommands),
+		CommandAliases:      v.GetStringMapString(KeyCommandAliases),
+		CommandPrefix:       v.GetString(KeyCommandPrefix),
+		DisableMentions:     v.GetBool(KeyDisableMentions),
+		DisableBareCommands: v.GetBool(KeyDisableBareCommands),
 	}
 }

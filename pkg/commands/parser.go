@@ -19,6 +19,8 @@ var (
 	// validCommands maps command names to their corresponding types
 	validCommands = map[string]CommandType{
 		"approve": CommandApprove,
+		"accept":  CommandApprove,
+		"lgtm":    CommandApprove,
 		"merge":   CommandMerge,
 	}
 )
@@ -28,15 +30,17 @@ var (
 // Supported formats:
 //   - /approve or /merge (slash commands with custom prefix)
 //   - @smyklot approve or @smyklot merge (mention commands)
+//   - approve, accept, lgtm, or merge (bare commands - exact match only)
 //
 // Commands are case-insensitive and can appear anywhere in the text
 // If multiple commands are present, the first one found is returned
-// Slash commands take priority over mention commands
+// Priority: slash commands > mention commands > bare commands
 //
 // Configuration options:
 //   - CommandPrefix: Custom prefix for slash commands (default: "/")
 //   - CommandAliases: Map aliases to command names (e.g., "app" -> "approve")
 //   - DisableMentions: Disable mention-style commands
+//   - DisableBareCommands: Disable bare commands (approve, lgtm, merge)
 //   - AllowedCommands: Only allow specified commands (empty = all allowed)
 //
 // If cfg is nil, default configuration is used
@@ -82,6 +86,17 @@ func ParseCommand(commentBody string, cfg *config.Config) (Command, error) {
 			}
 
 			// Invalid mention command found - return unknown
+			return cmd, nil
+		}
+	}
+
+	// Try to match a bare command if not disabled (lowest priority)
+	// Bare commands must be exact matches (no extra text before or after)
+	if !cfg.DisableBareCommands {
+		trimmedBody := strings.TrimSpace(commentBody)
+		commandName := strings.ToLower(trimmedBody)
+
+		if processCommand(commandName, cfg, &cmd) {
 			return cmd, nil
 		}
 	}

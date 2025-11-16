@@ -24,16 +24,20 @@ type Config struct {
 
 	// DisableMentions disables mention-style commands (@smyklot approve)
 	DisableMentions bool `json:"disable_mentions"`
+
+	// DisableBareCommands disables bare commands (approve, lgtm, merge)
+	DisableBareCommands bool `json:"disable_bare_commands"`
 }
 
 // Default returns a Config with default values
 func Default() *Config {
 	return &Config{
-		QuietSuccess:    false,
-		AllowedCommands: []string{},
-		CommandAliases:  make(map[string]string),
-		CommandPrefix:   DefaultCommandPrefix,
-		DisableMentions: false,
+		QuietSuccess:        false,
+		AllowedCommands:     []string{},
+		CommandAliases:      make(map[string]string),
+		CommandPrefix:       DefaultCommandPrefix,
+		DisableMentions:     false,
+		DisableBareCommands: false,
 	}
 }
 

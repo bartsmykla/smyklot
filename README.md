@@ -16,7 +16,7 @@ managed through GitHub's native `.github/CODEOWNERS` file.
 - Automated feedback with emoji reactions
 - Security-first design following GitHub Actions best practices
 - Zero external dependencies - runs entirely on GitHub Actions
-- TDD implementation with 98 passing tests
+- TDD implementation with 119 passing tests
 
 ## Quick Start
 
@@ -64,6 +64,7 @@ CLI Flags > Environment Variables > Defaults
 | `command_aliases` | string map | `{}` | Command aliases |
 | `command_prefix` | string | `/` | Slash command prefix |
 | `disable_mentions` | boolean | `false` | Disable mentions |
+| `disable_bare_commands` | boolean | `false` | Disable bare commands |
 
 ##### Configuration Methods
 
@@ -150,23 +151,54 @@ env:
 
 `@smyklot approve` will no longer work, only `/approve`.
 
+###### Example 6: Disable Bare Commands
+
+Only allow slash and mention commands:
+
+```yaml
+env:
+  SMYKLOT_DISABLE_BARE_COMMANDS: "true"
+```
+
+`lgtm` and `approve` will no longer work, only `/approve` and `@smyklot approve`.
+
 ## Usage
 
 ### Commands
 
 Smyklot responds to these commands in PR comments:
 
-| Command | Alias | Description |
-|---------|-------|-------------|
-| `/approve` | `@smyklot approve` | Approve the pull request |
-| `/merge` | `@smyklot merge` | Merge the pull request |
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `/approve` | `@smyklot approve`, `approve`, `accept`, `lgtm` | Approve the pull request |
+| `/merge` | `@smyklot merge`, `merge` | Merge the pull request |
+
+**Command Formats**:
+
+- **Slash commands**: `/approve`, `/merge` (highest priority)
+- **Mention commands**: `@smyklot approve`, `@smyklot merge` (medium priority)
+- **Bare commands**: `approve`, `accept`, `lgtm`, `merge` (lowest priority, exact match only)
+
+All commands are case-insensitive.
 
 ### Example: Approving a PR
 
-Comment on any pull request:
+Comment on any pull request using any of these formats:
 
 ```text
 /approve
+```
+
+or
+
+```text
+@smyklot approve
+```
+
+or
+
+```text
+lgtm
 ```
 
 Smyklot will:
@@ -265,9 +297,9 @@ ginkgo -r pkg/commands/
 task test:watch
 ```
 
-Current test coverage: 98 tests passing
+Current test coverage: 119 tests passing
 
-- 20 command parser tests
+- 41 command parser tests
 - 12 CODEOWNERS parser tests
 - 30 permission checker tests
 - 30 feedback system tests
@@ -277,11 +309,11 @@ Current test coverage: 98 tests passing
 
 ### How It Works
 
-1. User comments `/approve` or `/merge` on a PR
+1. User comments a command on a PR (e.g., `/approve`, `@smyklot merge`, `lgtm`)
 2. GitHub triggers `issue_comment` webhook
 3. `pr-commands.yml` workflow starts
 4. Action binary:
-   - Parses the command
+   - Parses the command (supports slash, mention, and bare formats)
    - Reads `.github/CODEOWNERS`
    - Checks user permissions
    - Calls GitHub API
