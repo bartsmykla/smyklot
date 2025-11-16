@@ -95,7 +95,7 @@ tasks:
     desc: Lint Markdown files
     cmds:
       - echo "▶ Linting Markdown files"
-      - markdownlint '**/*.md' --ignore node_modules --ignore vendor
+      - markdownlint '**/*.md' --ignore node_modules --ignore vendor --ignore tmp
       - echo "✓ Markdown files pass linting"
 
   lint:mod:

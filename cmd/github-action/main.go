@@ -211,10 +211,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	_ = v.BindPFlag(config.KeyAllowSelfApproval, cmd.Flags().Lookup(config.KeyAllowSelfApproval))
 
 	// Load runtime configuration from flags and environment
-	rc, err := loadRuntimeConfig(cmd)
-	if err != nil {
-		return err
-	}
+	rc := loadRuntimeConfig(cmd)
 
 	// Load bot configuration from Viper
 	bc, err := loadBotConfig(v)
@@ -235,7 +232,7 @@ func run(cmd *cobra.Command, _ []string) error {
 
 	// Handle deleted comments
 	if rc.CommentAction == "deleted" && !bc.DisableDeletedComments {
-		return handleDeletedComment(rc, bc)
+		return handleDeletedComment(rc)
 	}
 
 	// Parse the command from the comment
@@ -401,7 +398,7 @@ func run(cmd *cobra.Command, _ []string) error {
 }
 
 // loadRuntimeConfig loads runtime configuration from flags and environment
-func loadRuntimeConfig(cmd *cobra.Command) (*RuntimeConfig, error) {
+func loadRuntimeConfig(cmd *cobra.Command) *RuntimeConfig {
 	rc := &RuntimeConfig{}
 
 	// Get values from flags
@@ -433,7 +430,7 @@ func loadRuntimeConfig(cmd *cobra.Command) (*RuntimeConfig, error) {
 		rc.BotUsername = defaultBotUsername
 	}
 
-	return rc, nil
+	return rc
 }
 
 // loadBotConfig loads bot configuration from Viper
@@ -912,7 +909,7 @@ func postCombinedFeedback(client *github.Client, rc *RuntimeConfig, prNum, comme
 }
 
 // handleDeletedComment posts a notification that a command comment was deleted.
-func handleDeletedComment(rc *RuntimeConfig, bc *config.Config) error {
+func handleDeletedComment(rc *RuntimeConfig) error {
 	// Get GitHub App installation token if configured
 	token := rc.Token
 	installationToken, err := getInstallationToken(rc)
@@ -1064,7 +1061,7 @@ func handleReactions(
 
 		// Handle approve reaction
 		if reaction.Type == github.ReactionApprove {
-			if err := handleReactionApprove(client, rc, bc, checker, prNum, commentID, reaction.User); err != nil {
+			if err := handleReactionApprove(client, rc, bc, prNum, commentID, reaction.User); err != nil {
 				return err
 			}
 		}
@@ -1182,7 +1179,6 @@ func handleReactionApprove(
 	client *github.Client,
 	rc *RuntimeConfig,
 	bc *config.Config,
-	checker *permissions.Checker,
 	prNum, commentID int,
 	approver string,
 ) error {
