@@ -144,7 +144,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "smyklot-github-action",
+	Use:   "smyklot",
 	Short: "GitHub Actions bot for automated PR approvals and merges",
 	Long: `Smyklot is a GitHub Actions bot that enables automated PR approvals
 and merges based on CODEOWNERS permissions.
