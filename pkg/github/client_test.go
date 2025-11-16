@@ -266,21 +266,37 @@ var _ = Describe("GitHub Client [Unit]", func() {
 		Context("when getting PR information", func() {
 			It("should get PR info successfully", func() {
 				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+
 					Expect(r.Method).To(Equal("GET"))
-					Expect(r.URL.Path).To(Equal("/repos/owner/repo/pulls/1"))
 					Expect(r.Header.Get("Authorization")).To(Equal("token test-token"))
 
-					w.WriteHeader(http.StatusOK)
-					_ = json.NewEncoder(w).Encode(map[string]interface{}{
-						"number":    1,
-						"state":     "open",
-						"mergeable": true,
-						"title":     "Test PR",
-						"body":      "Test description",
-						"user": map[string]interface{}{
-							"login": "testuser",
-						},
-					})
+					// Handle both PR info and reviews requests
+					if r.URL.Path == "/repos/owner/repo/pulls/1" {
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode(map[string]interface{}{
+							"number":    1,
+							"state":     "open",
+							"mergeable": true,
+							"title":     "Test PR",
+							"body":      "Test description",
+							"user": map[string]interface{}{
+								"login": "testuser",
+							},
+						})
+					} else if r.URL.Path == "/repos/owner/repo/pulls/1/reviews" {
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode([]map[string]interface{}{
+							{
+								"state": "APPROVED",
+								"user": map[string]interface{}{
+									"login": "reviewer1",
+								},
+							},
+						})
+					} else {
+						Fail("unexpected request path: " + r.URL.Path)
+					}
 				}))
 
 				client, err := github.NewClient("test-token", server.URL)
@@ -294,6 +310,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				Expect(info.Mergeable).To(BeTrue())
 				Expect(info.Title).To(Equal("Test PR"))
 				Expect(info.Author).To(Equal("testuser"))
+				Expect(info.ApprovedBy).To(ConsistOf("reviewer1"))
 			})
 
 			It("should handle PR not found", func() {

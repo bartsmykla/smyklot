@@ -487,7 +487,57 @@ func (c *Client) GetPRInfo(owner, repo string, prNumber int) (*PRInfo, error) {
 		}
 	}
 
+	// Populate ApprovedBy field
+	info.ApprovedBy = c.getApprovers(owner, repo, prNumber)
+
 	return info, nil
+}
+
+// getApprovers retrieves the list of users who have approved a PR
+func (c *Client) getApprovers(owner, repo string, prNumber int) []string {
+	reviews, err := c.getPullRequestReviews(owner, repo, prNumber)
+	if err != nil {
+		// Return empty slice if we can't get reviews
+		return []string{}
+	}
+
+	approvers := make([]string, 0)
+	approverSet := make(map[string]bool)
+
+	for _, review := range reviews {
+		login := c.extractApproverFromReview(review)
+		if login == "" {
+			continue
+		}
+
+		// Use a set to deduplicate approvers
+		if !approverSet[login] {
+			approverSet[login] = true
+			approvers = append(approvers, login)
+		}
+	}
+
+	return approvers
+}
+
+// extractApproverFromReview extracts the approver username from a review
+func (c *Client) extractApproverFromReview(review map[string]interface{}) string {
+	state, ok := review["state"].(string)
+	if !ok || state != "APPROVED" {
+		return ""
+	}
+
+	user, ok := review["user"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	login, ok := user["login"].(string)
+	if !ok {
+		return ""
+	}
+
+	return login
 }
 
 // GetPRComments retrieves all comments on a pull request

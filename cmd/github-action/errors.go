@@ -51,6 +51,9 @@ var (
 
 	// ErrConfigLoad is returned when loading configuration fails
 	ErrConfigLoad = errors.New("failed to load configuration")
+
+	// ErrGetPRs is returned when fetching open PRs from GitHub fails
+	ErrGetPRs = errors.New("failed to fetch open PRs from GitHub")
 )
 
 // EnvVarError represents an error related to environment variable validation.
