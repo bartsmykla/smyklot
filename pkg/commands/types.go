@@ -7,11 +7,20 @@ const (
 	// CommandApprove represents the approve command
 	CommandApprove CommandType = "approve"
 
-	// CommandMerge represents the merge command
+	// CommandMerge represents the merge command (uses default or first allowed method)
 	CommandMerge CommandType = "merge"
+
+	// CommandSquash represents the squash merge command
+	CommandSquash CommandType = "squash"
+
+	// CommandRebase represents the rebase merge command
+	CommandRebase CommandType = "rebase"
 
 	// CommandUnapprove represents the unapprove command
 	CommandUnapprove CommandType = "unapprove"
+
+	// CommandCleanup represents the cleanup command
+	CommandCleanup CommandType = "cleanup"
 
 	// CommandHelp represents the help command
 	CommandHelp CommandType = "help"

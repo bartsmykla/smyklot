@@ -45,6 +45,9 @@ const (
 
 	// ReactionMerge represents merge command (🚀)
 	ReactionMerge ReactionType = "rocket"
+
+	// ReactionCleanup represents cleanup command (❤️)
+	ReactionCleanup ReactionType = "heart"
 )
 
 // Reaction represents a reaction on a comment
@@ -62,4 +65,21 @@ const (
 
 	// LabelReactionMerge indicates PR was merged via 🚀 reaction
 	LabelReactionMerge = "smyklot:reaction-merge"
+
+	// LabelReactionCleanup indicates cleanup was triggered via ❤️ reaction
+	LabelReactionCleanup = "smyklot:reaction-cleanup"
+)
+
+// MergeMethod represents the type of merge method to use
+type MergeMethod string
+
+const (
+	// MergeMethodMerge creates a merge commit
+	MergeMethodMerge MergeMethod = "merge"
+
+	// MergeMethodSquash squashes all commits into one
+	MergeMethodSquash MergeMethod = "squash"
+
+	// MergeMethodRebase rebases and merges
+	MergeMethodRebase MergeMethod = "rebase"
 )

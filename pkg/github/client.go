@@ -136,7 +136,7 @@ func (c *Client) ApprovePR(owner, repo string, prNumber int) error {
 //
 // This finds all APPROVED reviews by the authenticated user and dismisses them.
 func (c *Client) DismissReview(owner, repo string, prNumber int) error {
-	username, err := c.getAuthenticatedUser()
+	username, err := c.GetAuthenticatedUser()
 	if err != nil {
 		return err
 	}
@@ -149,8 +149,8 @@ func (c *Client) DismissReview(owner, repo string, prNumber int) error {
 	return c.dismissApprovedReviews(owner, repo, prNumber, username, reviews)
 }
 
-// getAuthenticatedUser retrieves the authenticated user's username
-func (c *Client) getAuthenticatedUser() (string, error) {
+// GetAuthenticatedUser retrieves the authenticated user's username
+func (c *Client) GetAuthenticatedUser() (string, error) {
 	userPath := "/user"
 	userData, err := c.makeRequest("GET", userPath, nil)
 	if err != nil {
@@ -244,13 +244,17 @@ func (c *Client) dismissReviewIfApprovedByUser(
 	return err
 }
 
-// MergePR merges a pull request
+// MergePR merges a pull request using the specified merge method
 //
-// This attempts to merge the PR using the default merge method.
-func (c *Client) MergePR(owner, repo string, prNumber int) error {
+// Supported merge methods: merge, squash, rebase
+func (c *Client) MergePR(owner, repo string, prNumber int, method MergeMethod) error {
 	path := fmt.Sprintf("/repos/%s/%s/pulls/%d/merge", owner, repo, prNumber)
 
-	_, err := c.makeRequest("PUT", path, nil)
+	body := map[string]interface{}{
+		"merge_method": string(method),
+	}
+
+	_, err := c.makeRequest("PUT", path, body)
 	return err
 }
 
@@ -416,6 +420,33 @@ func (c *Client) GetPRInfo(owner, repo string, prNumber int) (*PRInfo, error) {
 	}
 
 	return info, nil
+}
+
+// GetPRComments retrieves all comments on a pull request
+//
+// Returns a slice of comment data including ID, user, and body.
+func (c *Client) GetPRComments(owner, repo string, prNumber int) ([]map[string]interface{}, error) {
+	path := fmt.Sprintf("/repos/%s/%s/issues/%d/comments", owner, repo, prNumber)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var comments []map[string]interface{}
+	if err := json.Unmarshal(data, &comments); err != nil {
+		return nil, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	return comments, nil
+}
+
+// DeleteComment deletes a comment from a pull request
+func (c *Client) DeleteComment(owner, repo string, commentID int) error {
+	path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d", owner, repo, commentID)
+
+	_, err := c.makeRequest("DELETE", path, nil)
+	return err
 }
 
 // makeRequest makes an HTTP request to the GitHub API

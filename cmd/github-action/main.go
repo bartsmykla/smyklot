@@ -330,9 +330,27 @@ func run(_ *cobra.Command, _ []string) error {
 		case commands.CommandApprove:
 			fb, err = executeApprove(client, prNum)
 		case commands.CommandMerge:
-			fb, err = executeMerge(client, prNum)
+			fb, err = executeMerge(client, prNum, github.MergeMethodMerge)
+		case commands.CommandSquash:
+			fb, err = executeMerge(client, prNum, github.MergeMethodSquash)
+		case commands.CommandRebase:
+			fb, err = executeMerge(client, prNum, github.MergeMethodRebase)
 		case commands.CommandUnapprove:
 			fb, err = executeUnapprove(client, prNum)
+		case commands.CommandCleanup:
+			// Cleanup is special - it deletes the comment, so handle immediately
+			fb, err = executeCleanup(client, prNum, commentIDNum)
+			if err != nil {
+				return err
+			}
+			// If cleanup failed, post error feedback before returning
+			if fb.Type == feedback.Error {
+				if err := postCombinedFeedback(client, prNum, commentIDNum, fb); err != nil {
+					return err
+				}
+			}
+			// Cleanup complete (success case deletes comment, so no feedback needed)
+			return nil
 		default:
 			// Unknown command type, ignore
 			continue
@@ -538,32 +556,8 @@ func executeApprove(client *github.Client, prNum int) (*feedback.Feedback, error
 	return feedback.NewApprovalSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
 }
 
-func handleApprove(client *github.Client, prNum, commentID int) error {
-	// Add eyes reaction to acknowledge
-	if err := addEyesReaction(client, commentID); err != nil {
-		return err
-	}
-
-	// Approve the PR
-	if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
-		return postOperationFailure(
-			client,
-			prNum,
-			commentID,
-			err,
-			feedback.NewApprovalFailed,
-			ErrApprovePR,
-		)
-	}
-
-	// Post-success feedback
-	fb := feedback.NewApprovalSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
-
-	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
-}
-
-// executeMerge executes the merge command and returns feedback
-func executeMerge(client *github.Client, prNum int) (*feedback.Feedback, error) {
+// executeMerge executes the merge command with specified method and returns feedback
+func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (*feedback.Feedback, error) {
 	// Get PR info to check if it's mergeable
 	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
 	if err != nil {
@@ -576,54 +570,21 @@ func executeMerge(client *github.Client, prNum int) (*feedback.Feedback, error) 
 	}
 
 	// Merge the PR
-	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
-		return feedback.NewMergeFailed(err.Error()), nil
+	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, method); err != nil {
+		// If merge commits not allowed and using default merge method, try squash first
+		if method == github.MergeMethodMerge && strings.Contains(err.Error(), "Merge commits are not allowed") {
+			if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodSquash); err != nil {
+				// Try rebase if squash also fails
+				if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodRebase); err != nil {
+					return feedback.NewMergeFailed(err.Error()), nil
+				}
+			}
+		} else {
+			return feedback.NewMergeFailed(err.Error()), nil
+		}
 	}
 
 	return feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
-}
-
-// handleMerge handles the /merge command.
-func handleMerge(client *github.Client, prNum, commentID int) error {
-	// Add eyes reaction to acknowledge
-	if err := addEyesReaction(client, commentID); err != nil {
-		return err
-	}
-
-	// Get PR info to check if it's mergeable
-	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
-	if err != nil {
-		return postOperationFailure(
-			client,
-			prNum,
-			commentID,
-			err,
-			feedback.NewMergeFailed,
-			ErrMergePR,
-		)
-	}
-
-	// Check if PR is mergeable
-	if !info.Mergeable {
-		return postNotMergeable(client, prNum, commentID)
-	}
-
-	// Merge the PR
-	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
-		return postOperationFailure(
-			client,
-			prNum,
-			commentID,
-			err,
-			feedback.NewMergeFailed,
-			ErrMergePR,
-		)
-	}
-
-	// Post-success feedback
-	fb := feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
-
-	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
 // executeUnapprove executes the unapprove command and returns feedback
@@ -636,29 +597,84 @@ func executeUnapprove(client *github.Client, prNum int) (*feedback.Feedback, err
 	return feedback.NewUnapproveSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
 }
 
-// handleUnapprove handles the /unapprove command.
-func handleUnapprove(client *github.Client, prNum, commentID int) error {
-	// Add eyes reaction to acknowledge
-	if err := addEyesReaction(client, commentID); err != nil {
-		return err
+// executeCleanup executes the cleanup command and returns feedback
+//
+// Cleanup removes all bot reactions, approvals, and comments from the PR,
+// then deletes the triggering comment.
+func executeCleanup(client *github.Client, prNum, commentID int) (*feedback.Feedback, error) {
+	// Get authenticated user (bot) to identify bot's comments
+	botUsername, err := client.GetAuthenticatedUser()
+	if err != nil {
+		return feedback.NewCleanupFailed(err.Error()), nil
 	}
 
-	// Dismiss the review
-	if err := client.DismissReview(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
-		return postOperationFailure(
-			client,
-			prNum,
-			commentID,
-			err,
-			feedback.NewUnapproveFailed,
-			ErrDismissReview,
-		)
+	// Dismiss bot's review if present
+	_ = client.DismissReview(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+
+	// Get all comments on the PR
+	comments, err := client.GetPRComments(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	if err != nil {
+		return feedback.NewCleanupFailed(err.Error()), nil
 	}
 
-	// Post-success feedback
-	fb := feedback.NewUnapproveSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess)
+	// Delete all bot's comments (except the triggering one for now)
+	for _, comment := range comments {
+		user, ok := comment["user"].(map[string]interface{})
+		if !ok {
+			continue
+		}
 
-	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+		username, ok := user["login"].(string)
+		if !ok || username != botUsername {
+			continue
+		}
+
+		id, ok := comment["id"].(float64)
+		if !ok {
+			continue
+		}
+
+		commentIDInt := int(id)
+
+		// Skip the triggering comment for now (delete it last)
+		if commentIDInt == commentID {
+			continue
+		}
+
+		// Delete bot's comment
+		_ = client.DeleteComment(runtimeConfig.RepoOwner, runtimeConfig.RepoName, commentIDInt)
+	}
+
+	// Get all reactions on the triggering comment and remove them
+	reactions, err := client.GetCommentReactions(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		commentID,
+	)
+	if err == nil {
+		// Remove all bot's reactions
+		for _, reaction := range reactions {
+			if reaction.User == botUsername {
+				_ = client.RemoveReaction(
+					runtimeConfig.RepoOwner,
+					runtimeConfig.RepoName,
+					commentID,
+					reaction.Type,
+				)
+			}
+		}
+	}
+
+	// Delete the triggering comment last
+	if err := client.DeleteComment(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		commentID,
+	); err != nil {
+		return feedback.NewCleanupFailed(err.Error()), nil
+	}
+
+	return feedback.NewCleanupSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
 }
 
 // postCombinedFeedback posts combined feedback with appropriate reaction
@@ -832,6 +848,13 @@ func handleReactions(
 				return err
 			}
 		}
+
+		// Handle cleanup reaction
+		if reaction.Type == github.ReactionCleanup {
+			if err := handleReactionCleanup(client, prNum, commentID); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -909,6 +932,18 @@ func handleRemovedReactions(
 		)
 	}
 
+	// Check if cleanup reaction was removed
+	if labelMap[github.LabelReactionCleanup] && !reactionMap[github.ReactionCleanup] {
+		// Cleanup reaction was removed, just remove the label
+		// (no action needed since cleanup is one-time operation)
+		_ = client.RemoveLabel(
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			prNum,
+			github.LabelReactionCleanup,
+		)
+	}
+
 	return nil
 }
 
@@ -968,8 +1003,8 @@ func handleReactionMerge(
 		return postNotMergeable(client, prNum, commentID)
 	}
 
-	// Merge the PR
-	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+	// Merge the PR (using default merge method)
+	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodMerge); err != nil {
 		return postOperationFailure(
 			client,
 			prNum,
@@ -992,6 +1027,34 @@ func handleReactionMerge(
 	fb := feedback.NewReactionMergeSuccess(author, botConfig.QuietReactions)
 
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+}
+
+// handleReactionCleanup handles cleanup via ❤️ reaction.
+func handleReactionCleanup(
+	client *github.Client,
+	prNum, commentID int,
+) error {
+	// Execute cleanup
+	fb, err := executeCleanup(client, prNum, commentID)
+	if err != nil {
+		return err
+	}
+
+	// If cleanup failed, post error feedback
+	if fb.Type == feedback.Error {
+		return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
+	}
+
+	// Cleanup succeeded - the comment and reactions are already deleted by executeCleanup
+	// Remove the label to track that cleanup completed
+	_ = client.RemoveLabel(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		prNum,
+		github.LabelReactionCleanup,
+	)
+
+	return nil
 }
 
 // postNotMergeable posts feedback when PR is not mergeable.

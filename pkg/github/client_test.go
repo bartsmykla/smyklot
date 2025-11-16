@@ -225,7 +225,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.MergePR("owner", "repo", 1)
+				err = client.MergePR("owner", "repo", 1, github.MergeMethodMerge)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -240,7 +240,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.MergePR("owner", "repo", 1)
+				err = client.MergePR("owner", "repo", 1, github.MergeMethodMerge)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("409"))
 			})
@@ -256,7 +256,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = client.MergePR("owner", "repo", 1)
+				err = client.MergePR("owner", "repo", 1, github.MergeMethodMerge)
 				Expect(err).To(HaveOccurred())
 			})
 		})

@@ -293,6 +293,45 @@ func NewUnapproveFailed(reason string) *Feedback {
 	}
 }
 
+// NewCleanupSuccess creates success feedback for cleanup command
+//
+// The message acknowledges the cleanup was successful
+// If quietSuccess is true, no comment message is posted (emoji reaction only)
+func NewCleanupSuccess(author string, quietSuccess bool) *Feedback {
+	message := ""
+	if !quietSuccess {
+		message = fmt.Sprintf(
+			"✅ **Cleanup Complete**\n\n"+
+				"All bot reactions, approvals, and comments have been removed by @%s.",
+			author,
+		)
+	}
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "✅",
+		Message: message,
+	}
+}
+
+// NewCleanupFailed creates error feedback for a failed cleanup
+//
+// The reason parameter should describe why the cleanup failed
+func NewCleanupFailed(reason string) *Feedback {
+	message := fmt.Sprintf(
+		"❌ **Cleanup Failed**\n\n"+
+			"Failed to complete the cleanup operation.\n\n"+
+			"**Reason:** %s",
+		reason,
+	)
+
+	return &Feedback{
+		Type:    Error,
+		Emoji:   "❌",
+		Message: message,
+	}
+}
+
 // NewReactionApprovalSuccess creates success feedback for reaction-based approval
 //
 // The message acknowledges the approver and indicates the approval was triggered by reaction

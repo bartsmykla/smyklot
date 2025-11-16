@@ -24,13 +24,19 @@ var (
 		"accept":     CommandApprove,
 		"lgtm":       CommandApprove,
 		"merge":      CommandMerge,
+		"squash":     CommandSquash,
+		"rebase":     CommandRebase,
 		"unapprove":  CommandUnapprove,
 		"disapprove": CommandUnapprove,
+		"cleanup":    CommandCleanup,
 		"help":       CommandHelp,
 	}
 
 	// ErrContradictingCommands indicates contradicting commands were found
 	ErrContradictingCommands = errors.New("contradicting commands found: cannot use approve/merge with unapprove")
+
+	// ErrCleanupWithOtherCommands indicates cleanup was used with other commands
+	ErrCleanupWithOtherCommands = errors.New("cleanup command cannot be combined with other commands")
 )
 
 // ParseCommand parses comment text and extracts a command if present
@@ -92,6 +98,12 @@ func ParseCommand(commentBody string, cfg *config.Config) (Command, error) {
 	if hasContradictingCommands(commands) {
 		cmd.Error = ErrContradictingCommands.Error()
 		return cmd, ErrContradictingCommands
+	}
+
+	// Check if cleanup is combined with other commands
+	if hasCleanupWithOtherCommands(commands) {
+		cmd.Error = ErrCleanupWithOtherCommands.Error()
+		return cmd, ErrCleanupWithOtherCommands
 	}
 
 	// Populate the command struct
@@ -331,15 +343,24 @@ func isLineOnlyCommandsAndFillers(line string, cfg *config.Config) bool {
 // buildCommandList converts the commands map to an ordered slice
 func buildCommandList(commandsFound map[CommandType]bool) []CommandType {
 	var commands []CommandType
-	// Maintain consistent order: approve, merge, unapprove, help
+	// Maintain consistent order: approve, merge, squash, rebase, unapprove, cleanup, help
 	if commandsFound[CommandApprove] {
 		commands = append(commands, CommandApprove)
 	}
 	if commandsFound[CommandMerge] {
 		commands = append(commands, CommandMerge)
 	}
+	if commandsFound[CommandSquash] {
+		commands = append(commands, CommandSquash)
+	}
+	if commandsFound[CommandRebase] {
+		commands = append(commands, CommandRebase)
+	}
 	if commandsFound[CommandUnapprove] {
 		commands = append(commands, CommandUnapprove)
+	}
+	if commandsFound[CommandCleanup] {
+		commands = append(commands, CommandCleanup)
 	}
 	if commandsFound[CommandHelp] {
 		commands = append(commands, CommandHelp)
@@ -364,6 +385,23 @@ func hasContradictingCommands(commands []CommandType) bool {
 	}
 
 	return hasUnapprove && hasApproveOrMerge
+}
+
+// hasCleanupWithOtherCommands checks if cleanup is combined with other commands
+// Returns true if cleanup is present with any other command
+func hasCleanupWithOtherCommands(commands []CommandType) bool {
+	hasCleanup := false
+	hasOtherCommand := false
+
+	for _, cmd := range commands {
+		if cmd == CommandCleanup {
+			hasCleanup = true
+		} else {
+			hasOtherCommand = true
+		}
+	}
+
+	return hasCleanup && hasOtherCommand
 }
 
 // resolveCommand resolves aliases, validates the command, and returns the CommandType
