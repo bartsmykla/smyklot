@@ -449,6 +449,33 @@ func (c *Client) DeleteComment(owner, repo string, commentID int) error {
 	return err
 }
 
+// GetOpenPRs retrieves all open pull requests in a repository
+//
+// Returns a slice of PR data including number, title, and state.
+func (c *Client) GetOpenPRs(owner, repo string) ([]map[string]interface{}, error) {
+	path := fmt.Sprintf("/repos/%s/%s/pulls", owner, repo)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var prs []map[string]interface{}
+	if err := json.Unmarshal(data, &prs); err != nil {
+		return nil, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	// Filter only open PRs
+	var openPRs []map[string]interface{}
+	for _, pr := range prs {
+		if state, ok := pr["state"].(string); ok && state == "open" {
+			openPRs = append(openPRs, pr)
+		}
+	}
+
+	return openPRs, nil
+}
+
 // makeRequest makes an HTTP request to the GitHub API
 func (c *Client) makeRequest(method, path string, payload interface{}) ([]byte, error) {
 	url := c.baseURL + path
