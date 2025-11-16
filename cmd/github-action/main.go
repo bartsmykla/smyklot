@@ -9,6 +9,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -58,6 +59,9 @@ const (
 	errInvalidPRNum        = "invalid PR number"
 	errInvalidComment      = "invalid comment ID"
 	errInvalidInstallID    = "invalid installation ID"
+	errCommentTooLong      = "comment body exceeds maximum length"
+	errInvalidRepoName     = "invalid repository owner or name"
+	maxCommentBodyLength   = 10000 // 10KB - matches github.maxCommentBodyLength
 	stepSummaryTemplate    = `## Smyklot Configuration
 
 ### Runtime Configuration
@@ -86,6 +90,7 @@ const (
 | Disable Unapprove | ` + "`{{.DisableUnapprove}}`" + ` |
 | Disable Reactions | ` + "`{{.DisableReactions}}`" + ` |
 | Disable Deleted Comments | ` + "`{{.DisableDeletedComments}}`" + ` |
+| Allow Self Approval | ` + "`{{.AllowSelfApproval}}`" + ` |
 {{if .AllowedCommands}}| Allowed Commands | ` + "`{{.AllowedCommands}}`" + ` |
 {{else}}| Allowed Commands | All commands allowed |
 {{end}}
@@ -116,31 +121,33 @@ type RuntimeConfig struct {
 
 // stepSummaryData holds data for the step summary template.
 type stepSummaryData struct {
-	RepoOwner           string
-	RepoName            string
-	PRNumber            string
-	CommentID           string
-	CommentAuthor       string
-	CommentBody         string
-	GitHubApp           bool
-	AppID               string
-	InstallationID      string
-	QuietSuccess        bool
-	QuietReactions      bool
-	CommandPrefix       string
+	RepoOwner              string
+	RepoName               string
+	PRNumber               string
+	CommentID              string
+	CommentAuthor          string
+	CommentBody            string
+	GitHubApp              bool
+	AppID                  string
+	InstallationID         string
+	QuietSuccess           bool
+	QuietReactions         bool
+	CommandPrefix          string
 	DisableMentions        bool
 	DisableBareCommands    bool
 	DisableUnapprove       bool
 	DisableReactions       bool
 	DisableDeletedComments bool
+	AllowSelfApproval      bool
 	AllowedCommands        string
 	CommandAliases         map[string]string
 }
 
 var (
-	runtimeConfig RuntimeConfig
-	botConfig     *config.Config
-	v             *viper.Viper
+	runtimeConfig     RuntimeConfig
+	botConfig         *config.Config
+	v                 *viper.Viper
+	githubNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
 )
 
 var rootCmd = &cobra.Command{
@@ -184,6 +191,7 @@ func init() {
 	rootCmd.Flags().Bool(config.KeyQuietReactions, false, "Disable reaction-based approval/merge comments")
 	rootCmd.Flags().Bool(config.KeyDisableReactions, false, "Disable reaction-based approvals/merges")
 	rootCmd.Flags().Bool(config.KeyDisableDeletedComments, false, "Disable comments about deleted commands")
+	rootCmd.Flags().Bool(config.KeyAllowSelfApproval, false, "Allow PR authors to approve their own PRs")
 
 	// Bind flags to Viper
 	bindViperFlags([]string{
@@ -197,6 +205,7 @@ func init() {
 		config.KeyQuietReactions,
 		config.KeyDisableReactions,
 		config.KeyDisableDeletedComments,
+		config.KeyAllowSelfApproval,
 	})
 }
 
@@ -451,6 +460,32 @@ func validateConfig() error {
 		}
 	}
 
+	// Validate comment body length to prevent DoS
+	if len(runtimeConfig.CommentBody) > maxCommentBodyLength {
+		return NewInputError(
+			ErrInvalidInput,
+			runtimeConfig.CommentBody,
+			errCommentTooLong,
+		)
+	}
+
+	// Validate repository owner and name format
+	if !githubNamePattern.MatchString(runtimeConfig.RepoOwner) {
+		return NewInputError(
+			ErrInvalidInput,
+			runtimeConfig.RepoOwner,
+			errInvalidRepoName,
+		)
+	}
+
+	if !githubNamePattern.MatchString(runtimeConfig.RepoName) {
+		return NewInputError(
+			ErrInvalidInput,
+			runtimeConfig.RepoName,
+			errInvalidRepoName,
+		)
+	}
+
 	return nil
 }
 
@@ -553,6 +588,11 @@ func checkUserPermission(
 
 	// If CODEOWNERS has no approvers (empty file), check admin permissions
 	if len(checker.GetApprovers()) == 0 {
+		_, _ = fmt.Fprintf(
+			os.Stderr,
+			"WARNING: No CODEOWNERS found, falling back to admin permissions for %s\n",
+			username,
+		)
 		hasWrite, err := client.HasWritePermission(owner, repo, username)
 		if err != nil {
 			return false, err
@@ -580,10 +620,18 @@ func handleUnauthorized(
 //
 //nolint:unparam // error return kept for consistent function signature
 func executeApprove(client *github.Client, prNum int) (*feedback.Feedback, error) {
-	// Get PR info to check existing approvals
+	// Get PR info to check existing approvals and prevent self-approval
 	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
 	if err != nil {
 		return feedback.NewApprovalFailed(err.Error()), nil
+	}
+
+	// Prevent self-approval unless explicitly allowed
+	if !botConfig.AllowSelfApproval && info.Author == runtimeConfig.CommentAuthor {
+		return feedback.NewUnauthorized(
+			runtimeConfig.CommentAuthor,
+			[]string{"(self-approval not allowed)"},
+		), nil
 	}
 
 	// Check if already approved by the comment author
@@ -1095,7 +1143,7 @@ func handleReactionApprove(
 	prNum, commentID int,
 	approver string,
 ) error {
-	// Get PR info to check existing approvals
+	// Get PR info to check existing approvals and prevent self-approval
 	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
 	if err != nil {
 		return postOperationFailure(
@@ -1106,6 +1154,12 @@ func handleReactionApprove(
 			feedback.NewApprovalFailed,
 			ErrApprovePR,
 		)
+	}
+
+	// Prevent self-approval unless explicitly allowed
+	if !botConfig.AllowSelfApproval && info.Author == approver {
+		fb := feedback.NewUnauthorized(approver, []string{"(self-approval not allowed)"})
+		return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
 	}
 
 	// Get authenticated user (bot) to check if already approved
@@ -1167,7 +1221,7 @@ func handleReactionMerge(
 	prNum, commentID int,
 	author string,
 ) error {
-	// Get PR info to check if it's mergeable
+	// Get PR info to check if it's mergeable and prevent self-approval
 	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
 	if err != nil {
 		return postOperationFailure(
@@ -1178,6 +1232,12 @@ func handleReactionMerge(
 			feedback.NewMergeFailed,
 			ErrMergePR,
 		)
+	}
+
+	// Prevent self-approval unless explicitly allowed (merge also approves)
+	if !botConfig.AllowSelfApproval && info.Author == author {
+		fb := feedback.NewUnauthorized(author, []string{"(self-approval not allowed)"})
+		return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
 	}
 
 	// Check if PR is mergeable
@@ -1300,6 +1360,20 @@ func postNotMergeable(client *github.Client, prNum, commentID int) error {
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionWarning)
 }
 
+// sanitizeCommentBody redacts sensitive information from comment body
+func sanitizeCommentBody(body string, maxLen int) string {
+	// Redact potential secrets (tokens, API keys, passwords)
+	sensitivePattern := regexp.MustCompile(`(?i)(token|key|secret|password|bearer)[:=]\s*\S+`)
+	sanitized := sensitivePattern.ReplaceAllString(body, "$1: [REDACTED]")
+
+	// Truncate if too long
+	if len(sanitized) > maxLen {
+		return sanitized[:maxLen] + "..."
+	}
+
+	return sanitized
+}
+
 // getInstallationToken generates a GitHub App installation token if credentials are provided.
 //
 // Returns an empty string if GitHub App credentials are not configured.
@@ -1378,23 +1452,24 @@ func writeStepSummary() error {
 	}
 
 	data := stepSummaryData{
-		RepoOwner:           runtimeConfig.RepoOwner,
-		RepoName:            runtimeConfig.RepoName,
-		PRNumber:            runtimeConfig.PRNumber,
-		CommentID:           runtimeConfig.CommentID,
-		CommentAuthor:       runtimeConfig.CommentAuthor,
-		CommentBody:         runtimeConfig.CommentBody,
-		GitHubApp:           runtimeConfig.GitHubAppPrivateKey != "",
-		AppID:               runtimeConfig.GitHubAppID,
-		InstallationID:      runtimeConfig.InstallationID,
-		QuietSuccess:        botConfig.QuietSuccess,
-		QuietReactions:      botConfig.QuietReactions,
-		CommandPrefix:       botConfig.CommandPrefix,
+		RepoOwner:              runtimeConfig.RepoOwner,
+		RepoName:               runtimeConfig.RepoName,
+		PRNumber:               runtimeConfig.PRNumber,
+		CommentID:              runtimeConfig.CommentID,
+		CommentAuthor:          runtimeConfig.CommentAuthor,
+		CommentBody:            sanitizeCommentBody(runtimeConfig.CommentBody, 100),
+		GitHubApp:              runtimeConfig.GitHubAppPrivateKey != "",
+		AppID:                  runtimeConfig.GitHubAppID,
+		InstallationID:         runtimeConfig.InstallationID,
+		QuietSuccess:           botConfig.QuietSuccess,
+		QuietReactions:         botConfig.QuietReactions,
+		CommandPrefix:          botConfig.CommandPrefix,
 		DisableMentions:        botConfig.DisableMentions,
 		DisableBareCommands:    botConfig.DisableBareCommands,
 		DisableUnapprove:       botConfig.DisableUnapprove,
 		DisableReactions:       botConfig.DisableReactions,
 		DisableDeletedComments: botConfig.DisableDeletedComments,
+		AllowSelfApproval:      botConfig.AllowSelfApproval,
 		AllowedCommands:        allowedCommands,
 		CommandAliases:         botConfig.CommandAliases,
 	}

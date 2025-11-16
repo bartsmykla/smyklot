@@ -40,8 +40,9 @@ func NewCheckerFromContent(content string) (*Checker, error) {
 
 	codeowners, err := ParseCodeownersContent(content)
 	if err != nil {
-		// If the content cannot be parsed, treat it as having no approvers
-		return checker, nil
+		// Fail-closed: return error if CODEOWNERS cannot be parsed
+		// This prevents privilege escalation via corrupted CODEOWNERS files
+		return nil, NewCheckerError(ErrParseFailed, "content", err)
 	}
 
 	checker.rootApprovers = codeowners.GetGlobalOwners()
@@ -76,10 +77,9 @@ func NewChecker(repoPath string) (*Checker, error) {
 	if _, err := os.Stat(codeownersPath); err == nil {
 		codeowners, err := ParseCodeownersFile(codeownersPath)
 		if err != nil {
-			// If the CODEOWNERS file exists but cannot be parsed, treat it as
-			// having no approvers. This is a soft failure to avoid blocking
-			// operations due to syntax errors.
-			return checker, nil
+			// Fail-closed: return error if CODEOWNERS cannot be parsed
+			// This prevents privilege escalation via corrupted CODEOWNERS files
+			return nil, err
 		}
 		checker.rootApprovers = codeowners.GetGlobalOwners()
 	}

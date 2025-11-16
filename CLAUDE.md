@@ -10,8 +10,9 @@ cleanup operations, and reaction-based approvals (👍/🚀/❤️). Built in Go
 using TDD methodology with Ginkgo/Gomega.
 
 **Current Status**: Phase 1 complete (Docker-based GitHub Action)
-**Test Coverage**: 130+ tests passing
+**Test Coverage**: 181 tests passing (59.5% composite coverage)
 **Deployment**: Docker image published to ghcr.io
+**Security**: Hardened with defense-in-depth practices
 
 ## Architecture
 
@@ -228,35 +229,53 @@ Steps:
 - [x] Comment edit/delete handling
 - [x] CODEOWNERS parser (global owners only)
 - [x] CODEOWNERS API fetching (no repository checkout)
-- [x] Permission checker (global ownership)
+- [x] Permission checker (global ownership with fail-closed parsing)
 - [x] Configuration system (Viper with JSON/individual variables)
+- [x] Self-approval prevention (configurable, default: disabled)
+- [x] Security hardening (GraphQL injection prevention, rate limiting, input validation)
 - [x] Feedback system (reactions + comments)
-- [x] GitHub API client (full CRUD operations)
+- [x] GitHub API client (full CRUD operations with retry logic)
 - [x] GitHub App integration with token generation
 - [x] Docker-based GitHub Action (ghcr.io)
 - [x] GoReleaser v2 automated releases
 - [x] GitHub Actions workflows (test, release)
 - [x] Documentation (README, CLAUDE.md, GitHub App description)
-- [x] 130+ tests passing
+- [x] 181 tests passing
 
 **Not Implemented**:
 
 - [ ] Path-specific CODEOWNERS patterns (Phase 2)
-- [ ] Self-approval prevention (Phase 2)
 - [ ] Team support in CODEOWNERS (Phase 2)
+- [ ] Required approvals count (Phase 2)
 
 ### Phase 2: Enhanced Permissions (Planned)
 
 - Path-specific ownership patterns
 - Scoped approval based on changed files
 - Team support (`@org/team-name`)
-- Prevent self-approval
+- Required approvals count
 
 ### Phase 3: Kubernetes Deployment (Future)
 
-- HTTP webhook server
-- Persistent service deployment
-- Scalable architecture
+**Prerequisites** (from security investigation):
+
+- [x] GraphQL injection prevention (COMPLETED - parameterized queries)
+- [x] HTTP client timeout and connection pooling (COMPLETED)
+- [x] Rate limiting and retry logic (COMPLETED)
+- [x] Input validation (COMPLETED)
+- [x] Fail-closed CODEOWNERS parsing (COMPLETED)
+- [ ] Refactor global mutable state to request-scoped parameters
+- [ ] Add context.Context propagation throughout
+- [ ] Add concurrency tests with `-race` flag
+- [ ] Implement comprehensive audit logging
+
+**Deployment**:
+
+- [ ] HTTP webhook server
+- [ ] Persistent service deployment
+- [ ] Scalable architecture
+- [ ] Prometheus metrics
+- [ ] Helm chart
 
 ### Phase 4: Discord Integration (Future)
 
@@ -364,15 +383,86 @@ The workflows can be tested on `bartsmykla/.dotfiles`:
 4. Comment `/approve` or `/merge`
 5. Verify reactions and API calls
 
+## Security Features
+
+**Input Validation**:
+
+- Comment body length: max 10KB (prevents DoS)
+- Repository name format: alphanumeric + hyphens (prevents path traversal)
+- CODEOWNERS file size: max 1MB (prevents memory exhaustion)
+
+**API Security**:
+
+- GraphQL queries: parameterized (prevents injection)
+- HTTP client: 30s timeout with connection pooling
+- Retry logic: exponential backoff for 429/5xx errors
+- Rate limiting: automatic handling with backoff
+
+**Access Control**:
+
+- CODEOWNERS parsing: fail-closed (errors on parse failure)
+- Self-approval: configurable prevention (default: disabled)
+- Logging: WARNING when falling back to admin permissions
+
+**Data Protection**:
+
+- Step summary: sanitizes secrets (token, key, secret, password)
+- Comment body: truncated and redacted in logs
+
+## Configuration
+
+All configuration options support three input methods with precedence:
+**CLI flags > Environment variables > JSON config > Defaults**
+
+### JSON Configuration
+
+```json
+{
+  "quiet_success": false,
+  "quiet_reactions": false,
+  "allowed_commands": [],
+  "command_aliases": {},
+  "command_prefix": "/",
+  "disable_mentions": false,
+  "disable_bare_commands": false,
+  "disable_unapprove": false,
+  "disable_reactions": false,
+  "disable_deleted_comments": false,
+  "allow_self_approval": false
+}
+```
+
+### Environment Variables
+
+All variables prefixed with `SMYKLOT_`:
+
+- `SMYKLOT_QUIET_SUCCESS`
+- `SMYKLOT_QUIET_REACTIONS`
+- `SMYKLOT_ALLOWED_COMMANDS`
+- `SMYKLOT_COMMAND_ALIASES`
+- `SMYKLOT_COMMAND_PREFIX`
+- `SMYKLOT_DISABLE_MENTIONS`
+- `SMYKLOT_DISABLE_BARE_COMMANDS`
+- `SMYKLOT_DISABLE_UNAPPROVE`
+- `SMYKLOT_DISABLE_REACTIONS`
+- `SMYKLOT_DISABLE_DELETED_COMMENTS`
+- `SMYKLOT_ALLOW_SELF_APPROVAL`
+
+### CLI Flags
+
+Use `--` prefix with kebab-case, e.g., `--allow-self-approval`
+
 ## Important Notes
 
 - **CODEOWNERS format**: Line-based, not YAML (GitHub standard)
 - **Global owners only**: Phase 1 supports only `*` pattern
+- **Self-approval**: Disabled by default (configurable)
 - **Emoji-only success**: Success feedback uses reaction only (no comment)
 - **Comments for errors**: Errors/warnings post both reaction and comment
 - **Environment variables**: All inputs from GitHub context, not CLI args
 - **No external dependencies**: Runs entirely on GitHub Actions
 - **Stateless**: Each command execution is independent
+- **Phase 3 readiness**: Requires refactoring for concurrent execution
 
 ## Resources
 

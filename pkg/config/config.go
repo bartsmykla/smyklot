@@ -42,6 +42,9 @@ const (
 	// KeyDisableDeletedComments is the config key for disable_deleted_comments setting
 	KeyDisableDeletedComments = "disable_deleted_comments"
 
+	// KeyAllowSelfApproval is the config key for allow_self_approval setting
+	KeyAllowSelfApproval = "allow_self_approval"
+
 	// EnvPrefix is the prefix for environment variables
 	EnvPrefix = "SMYKLOT"
 
@@ -62,6 +65,7 @@ func SetupViper(v *viper.Viper) {
 	v.SetDefault(KeyDisableUnapprove, false)
 	v.SetDefault(KeyDisableReactions, false)
 	v.SetDefault(KeyDisableDeletedComments, false)
+	v.SetDefault(KeyAllowSelfApproval, false)
 
 	// Enable environment variable support
 	v.SetEnvPrefix(EnvPrefix)
@@ -81,6 +85,7 @@ func LoadFromViper(v *viper.Viper) *Config {
 		DisableUnapprove:       v.GetBool(KeyDisableUnapprove),
 		DisableReactions:       v.GetBool(KeyDisableReactions),
 		DisableDeletedComments: v.GetBool(KeyDisableDeletedComments),
+		AllowSelfApproval:      v.GetBool(KeyAllowSelfApproval),
 	}
 }
 

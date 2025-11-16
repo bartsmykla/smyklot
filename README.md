@@ -201,7 +201,8 @@ Set a `SMYKLOT_CONFIG` repository variable with your complete configuration:
   "disable_bare_commands": false,
   "disable_unapprove": false,
   "disable_reactions": false,
-  "disable_deleted_comments": false
+  "disable_deleted_comments": false,
+  "allow_self_approval": false
 }
 ```
 
@@ -221,6 +222,7 @@ Configure individual settings via repository variables or environment variables 
 | `SMYKLOT_DISABLE_UNAPPROVE` | boolean | `false` | Disable unapprove command |
 | `SMYKLOT_DISABLE_REACTIONS` | boolean | `false` | Disable reaction-based approvals/merges |
 | `SMYKLOT_DISABLE_DELETED_COMMENTS` | boolean | `false` | Disable handling of deleted comments |
+| `SMYKLOT_ALLOW_SELF_APPROVAL` | boolean | `false` | Allow PR authors to approve their own PRs |
 
 #### Configuration Examples
 
@@ -281,6 +283,25 @@ env:
   SMYKLOT_DISABLE_DELETED_COMMENTS: "true"
 ```
 
+##### Example 6: Allow Self-Approval
+
+**⚠️ Not recommended for production** - Allow PR authors to approve their own PRs:
+
+```yaml
+env:
+  SMYKLOT_ALLOW_SELF_APPROVAL: "true"
+```
+
+or via JSON:
+
+```json
+{
+  "allow_self_approval": true
+}
+```
+
+**Security Note**: By default, Smyklot prevents self-approval to enforce separation of duties. Only enable this in development/testing environments.
+
 ## Architecture
 
 ### How It Works
@@ -307,22 +328,53 @@ env:
 - Only global owners (`* @username`) are supported
 - Global owners can approve/merge any PR
 - Reaction-based approvals/merges with tracking
+- Self-approval prevention (configurable, disabled by default)
+- Fail-closed CODEOWNERS parsing (returns error if file is corrupted)
 
 **Phase 2 (Planned)**:
 
 - Path-specific ownership patterns
 - Scoped permissions based on changed files
 - Team support (`@org/team-name`)
-- Self-approval prevention
+- Required approvals count
 
 ### Security
 
-- All inputs passed via environment variables
-- No shell interpolation of user data
-- Actions pinned by commit digest
+Smyklot implements defense-in-depth security practices:
+
+**Input Validation**:
+
+- Comment body length validation (max 10KB) - prevents DoS attacks
+- Repository owner/name format validation - prevents path traversal
+- All inputs passed via environment variables (no shell interpolation)
+
+**API Security**:
+
+- Parameterized GraphQL queries - prevents injection attacks
+- HTTP client timeout (30s) - prevents hung requests
+- Exponential backoff retry logic - handles rate limiting gracefully
+- Connection pooling - optimizes resource usage
+
+**Access Control**:
+
+- CODEOWNERS-based authorization with fail-closed parsing
+- Self-approval prevention (configurable, disabled by default)
 - Minimal workflow permissions (contents: read, pull-requests: write)
 - Token-based authentication via GitHub App
-- CODEOWNERS file fetched via API (no repository checkout)
+
+**Data Protection**:
+
+- Sensitive data sanitization in logs (tokens, keys, secrets redacted)
+- Maximum CODEOWNERS file size (1MB) - prevents memory exhaustion
+- No repository checkout required (CODEOWNERS fetched via API)
+
+**Supply Chain Security**:
+
+- Actions pinned by commit digest
+- Go dependencies verified (`go mod verify`)
+- Docker images use minimal base (`FROM scratch`)
+
+For detailed security information, see our [Security Policy](SECURITY.md).
 
 ## Development
 
@@ -441,16 +493,33 @@ Current test coverage: 130+ tests passing
 - [ ] Path-specific ownership patterns
 - [ ] Scoped approval requirements based on changed files
 - [ ] Team support in CODEOWNERS (`@org/team-name`)
-- [ ] Self-approval prevention
+- [x] Self-approval prevention (configurable)
 - [ ] Required approvals count
 
 ### Phase 3: Kubernetes Deployment (Future)
 
-- [ ] HTTP webhook server
-- [ ] Persistent service deployment
-- [ ] Scalable architecture
+See [PHASE3_PLAN.md](PHASE3_PLAN.md) for detailed implementation plan.
+
+**Prerequisites** (Security Hardening):
+
+- [x] GraphQL injection prevention
+- [x] HTTP client timeout and connection pooling
+- [x] Rate limiting and retry logic
+- [x] Input validation
+- [x] Fail-closed CODEOWNERS parsing
+
+**Remaining Work**:
+
+- [ ] Refactor global mutable state to request-scoped parameters
+- [ ] Add context.Context propagation throughout
+- [ ] Implement HTTP webhook server
+- [ ] Add concurrency tests with `-race` flag
+- [ ] Implement comprehensive audit logging
+- [ ] Kubernetes deployment (Helm chart)
 - [ ] Prometheus metrics
-- [ ] Helm chart
+- [ ] Migration strategy
+
+**Estimated Effort**: 18-30 days
 
 ### Phase 4: Discord Integration (Future)
 

@@ -13,11 +13,19 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
-	defaultBaseURL = "https://api.github.com"
-	userAgent      = "smyklot-github-app"
+	defaultBaseURL        = "https://api.github.com"
+	userAgent             = "smyklot-github-app"
+	defaultTimeout        = 30 * time.Second
+	maxIdleConns          = 100
+	maxIdleConnsPerHost   = 10
+	idleConnTimeout       = 90 * time.Second
+	maxRetries            = 3
+	maxCodeownersSize     = 1024 * 1024 // 1MB
+	maxCommentBodyLength  = 10000       // 10KB
 )
 
 // Client is a GitHub API client
@@ -41,9 +49,16 @@ func NewClient(token, baseURL string) (*Client, error) {
 	}
 
 	return &Client{
-		httpClient: &http.Client{},
-		token:      token,
-		baseURL:    baseURL,
+		httpClient: &http.Client{
+			Timeout: defaultTimeout,
+			Transport: &http.Transport{
+				MaxIdleConns:        maxIdleConns,
+				MaxIdleConnsPerHost: maxIdleConnsPerHost,
+				IdleConnTimeout:     idleConnTimeout,
+			},
+		},
+		token:   token,
+		baseURL: baseURL,
 	}, nil
 }
 
@@ -129,7 +144,7 @@ func (c *Client) ApprovePR(owner, repo string, prNumber int) error {
 		"event": "APPROVE",
 	}
 
-	_, err := c.makeRequest("POST", path, payload)
+	_, err := c.makeRequestWithRetry("POST", path, payload)
 	return err
 }
 
@@ -255,7 +270,7 @@ func (c *Client) MergePR(owner, repo string, prNumber int, method MergeMethod) e
 		"merge_method": string(method),
 	}
 
-	_, err := c.makeRequest("PUT", path, body)
+	_, err := c.makeRequestWithRetry("PUT", path, body)
 	return err
 }
 
@@ -300,14 +315,18 @@ func (c *Client) EnableAutoMerge(owner, repo string, prNumber int, method MergeM
 		gqlMethod = "MERGE"
 	}
 
-	// Enable auto-merge via GraphQL
+	// Enable auto-merge via GraphQL (using parameterized query to prevent injection)
 	graphqlPath := "/graphql"
 	query := map[string]interface{}{
-		"query": fmt.Sprintf(
-			`mutation { enablePullRequestAutoMerge(input: {pullRequestId: "%s", mergeMethod: %s}) { clientMutationId } }`,
-			nodeID,
-			gqlMethod,
-		),
+		"query": `mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+			enablePullRequestAutoMerge(input: {pullRequestId: $pullRequestId, mergeMethod: $mergeMethod}) {
+				clientMutationId
+			}
+		}`,
+		"variables": map[string]interface{}{
+			"pullRequestId": nodeID,
+			"mergeMethod":   gqlMethod,
+		},
 	}
 
 	_, err = c.makeRequest("POST", graphqlPath, query)
@@ -403,7 +422,7 @@ func (c *Client) GetLabels(owner, repo string, prNumber int) ([]string, error) {
 func (c *Client) GetCodeowners(owner, repo string) (string, error) {
 	path := fmt.Sprintf("/repos/%s/%s/contents/.github/CODEOWNERS", owner, repo)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequestWithRetry("GET", path, nil)
 	if err != nil {
 		// Return empty string if CODEOWNERS doesn't exist (404)
 		var apiErr *APIError
@@ -435,6 +454,17 @@ func (c *Client) GetCodeowners(owner, repo string) (string, error) {
 		return "", NewAPIError(ErrResponseParse, 0, "GET", path, err)
 	}
 
+	// Validate decoded content size to prevent memory exhaustion
+	if len(decoded) > maxCodeownersSize {
+		return "", NewAPIError(
+			ErrResponseParse,
+			0,
+			"GET",
+			path,
+			fmt.Errorf("CODEOWNERS file too large: %d bytes (max: %d)", len(decoded), maxCodeownersSize),
+		)
+	}
+
 	return string(decoded), nil
 }
 
@@ -445,7 +475,7 @@ func (c *Client) GetCodeowners(owner, repo string) (string, error) {
 func (c *Client) GetPRInfo(owner, repo string, prNumber int) (*PRInfo, error) {
 	path := fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, repo, prNumber)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequestWithRetry("GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -546,7 +576,7 @@ func (c *Client) extractApproverFromReview(review map[string]interface{}) string
 func (c *Client) GetPRComments(owner, repo string, prNumber int) ([]map[string]interface{}, error) {
 	path := fmt.Sprintf("/repos/%s/%s/issues/%d/comments", owner, repo, prNumber)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequestWithRetry("GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +603,7 @@ func (c *Client) DeleteComment(owner, repo string, commentID int) error {
 func (c *Client) GetOpenPRs(owner, repo string) ([]map[string]interface{}, error) {
 	path := fmt.Sprintf("/repos/%s/%s/pulls", owner, repo)
 
-	data, err := c.makeRequest("GET", path, nil)
+	data, err := c.makeRequestWithRetry("GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -635,7 +665,8 @@ func (c *Client) IsMergeQueueEnabled(owner, repo, branch string) (bool, error) {
 	data, err := c.makeRequest("GET", path, nil)
 	if err != nil {
 		// 404 means branch protection not enabled
-		if strings.Contains(err.Error(), "404") {
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
 			return false, nil
 		}
 		return false, err
@@ -661,6 +692,36 @@ func (c *Client) IsMergeQueueEnabled(owner, repo, branch string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// makeRequestWithRetry makes an HTTP request with retry logic and exponential backoff
+func (c *Client) makeRequestWithRetry(method, path string, payload interface{}) ([]byte, error) {
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		data, err := c.makeRequest(method, path, payload)
+		if err == nil {
+			return data, nil
+		}
+
+		lastErr = err
+
+		// Check for rate limiting (429) or server errors (5xx)
+		var apiErr *APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.StatusCode == 429 || (apiErr.StatusCode >= 500 && apiErr.StatusCode < 600) {
+				// Exponential backoff: 1s, 2s, 4s
+				backoff := time.Duration(1<<uint(attempt)) * time.Second
+				time.Sleep(backoff)
+				continue
+			}
+		}
+
+		// For other errors, don't retry
+		return nil, err
+	}
+
+	return nil, lastErr
 }
 
 // makeRequest makes an HTTP request to the GitHub API

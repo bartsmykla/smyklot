@@ -39,6 +39,10 @@ type Config struct {
 
 	// DisableDeletedComments disables comments about deleted commands
 	DisableDeletedComments bool `json:"disable_deleted_comments"`
+
+	// AllowSelfApproval allows PR authors to approve their own PRs
+	// Default is false (self-approval is not allowed)
+	AllowSelfApproval bool `json:"allow_self_approval"`
 }
 
 // Default returns a Config with default values
@@ -54,6 +58,7 @@ func Default() *Config {
 		DisableUnapprove:       false,
 		DisableReactions:       false,
 		DisableDeletedComments: false,
+		AllowSelfApproval:      false,
 	}
 }
 

@@ -22,6 +22,9 @@ var (
 
 	// ErrRepoPathNotExist is returned when the repository path does not exist
 	ErrRepoPathNotExist = errors.New("repository path does not exist")
+
+	// ErrParseFailed is returned when parsing CODEOWNERS content fails
+	ErrParseFailed = errors.New("failed to parse CODEOWNERS content")
 )
 
 // ParseError represents an error that occurred during CODEOWNERS file parsing
