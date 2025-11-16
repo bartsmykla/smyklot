@@ -260,7 +260,7 @@ tasks:
       Usage: task release VERSION=1.8.0
 
       This will:
-      1. Bump version in action.yml
+      1. Bump version in action.yaml
       2. Bump version in workflow files
       3. Commit changes
       4. Create and push git tag
@@ -274,19 +274,19 @@ tasks:
           echo "❌ Invalid version format. Use semantic versioning (e.g., 1.8.0)"
           exit 1
         fi
-      # Bump version in action.yml
-      - echo "  Updating action.yml"
-      - perl -i -pe 's|smyklot:[0-9]+\.[0-9]+\.[0-9]+|smyklot:{{.VERSION}}|g' action.yml
+      # Bump version in action.yaml
+      - echo "  Updating action.yaml"
+      - perl -i -pe 's|smyklot:[0-9]+\.[0-9]+\.[0-9]+|smyklot:{{.VERSION}}|g' action.yaml
       # Bump version in workflows
       - echo "  Updating workflow files"
       - perl -i -pe 's|smyklot:[0-9]+\.[0-9]+\.[0-9]+|smyklot:{{.VERSION}}|g' .github/workflows/pr-commands.yml
       - perl -i -pe 's|smyklot:[0-9]+\.[0-9]+\.[0-9]+|smyklot:{{.VERSION}}|g' .github/workflows/poll-reactions.yml
       # Show diff
       - echo "  Changes:"
-      - git diff action.yml .github/workflows/
+      - git diff action.yaml .github/workflows/
       # Commit changes
       - echo "  Creating commit"
-      - git add action.yml .github/workflows/pr-commands.yml .github/workflows/poll-reactions.yml
+      - git add action.yaml .github/workflows/pr-commands.yml .github/workflows/poll-reactions.yml
       - |
         git commit -sS -m "chore(release): bump version to {{.VERSION}}"
       # Create tag
