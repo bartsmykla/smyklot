@@ -5,6 +5,9 @@
 package config
 
 import (
+	"encoding/json"
+	"os"
+
 	"github.com/spf13/viper"
 )
 
@@ -41,6 +44,9 @@ const (
 
 	// EnvPrefix is the prefix for environment variables
 	EnvPrefix = "SMYKLOT"
+
+	// EnvConfig is the environment variable for JSON configuration
+	EnvConfig = "SMYKLOT_CONFIG"
 )
 
 // SetupViper configures Viper with default values and environment variable bindings
@@ -76,4 +82,26 @@ func LoadFromViper(v *viper.Viper) *Config {
 		DisableReactions:       v.GetBool(KeyDisableReactions),
 		DisableDeletedComments: v.GetBool(KeyDisableDeletedComments),
 	}
+}
+
+// LoadJSONConfig reads and parses JSON configuration from SMYKLOT_CONFIG environment variable
+func LoadJSONConfig(v *viper.Viper) error {
+	configJSON := os.Getenv(EnvConfig)
+	if configJSON == "" {
+		return nil // No JSON config provided
+	}
+
+	// Parse JSON into a map
+	var configMap map[string]interface{}
+	if err := json.Unmarshal([]byte(configJSON), &configMap); err != nil {
+		return err
+	}
+
+	// Merge each config value into Viper
+	for key, value := range configMap {
+		// Viper expects snake_case keys
+		v.Set(key, value)
+	}
+
+	return nil
 }

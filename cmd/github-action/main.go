@@ -405,6 +405,11 @@ func loadConfig() error {
 	loadEnvIfEmpty(&runtimeConfig.GitHubAppID, envGitHubAppID)
 	loadEnvIfEmpty(&runtimeConfig.InstallationID, envInstallationID)
 
+	// Load JSON configuration from SMYKLOT_CONFIG if present
+	if err := config.LoadJSONConfig(v); err != nil {
+		return NewConfigError(ErrConfigLoad, err)
+	}
+
 	// Load bot configuration from Viper
 	botConfig = config.LoadFromViper(v)
 

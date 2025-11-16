@@ -48,6 +48,9 @@ var (
 
 	// ErrStepSummary is returned when step summary operations fail
 	ErrStepSummary = errors.New("failed to write step summary")
+
+	// ErrConfigLoad is returned when loading configuration fails
+	ErrConfigLoad = errors.New("failed to load configuration")
 )
 
 // EnvVarError represents an error related to environment variable validation.
@@ -138,6 +141,35 @@ func (e *GitHubError) Error() string {
 }
 
 func (e *GitHubError) Unwrap() error {
+	if e.Err != nil {
+		return e.Err
+	}
+
+	return e.Op
+}
+
+// ConfigError represents an error from configuration loading.
+type ConfigError struct {
+	Op  error
+	Err error
+}
+
+func NewConfigError(op, err error) error {
+	return &ConfigError{
+		Op:  op,
+		Err: err,
+	}
+}
+
+func (e *ConfigError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("%s: %v", e.Op, e.Err)
+	}
+
+	return e.Op.Error()
+}
+
+func (e *ConfigError) Unwrap() error {
 	if e.Err != nil {
 		return e.Err
 	}
