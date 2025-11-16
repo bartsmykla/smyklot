@@ -232,4 +232,90 @@ var _ = Describe("Feedback System [Unit]", func() {
 			Expect(fb.Message).To(MatchRegexp(`checks failing`))
 		})
 	})
+
+	Describe("CombineFeedback", func() {
+		It("should return single feedback when only one provided", func() {
+			fb := feedback.NewSuccess()
+			combined := feedback.CombineFeedback([]*feedback.Feedback{fb}, false)
+			Expect(combined).To(Equal(fb))
+		})
+
+		It("should return success feedback when empty slice", func() {
+			combined := feedback.CombineFeedback([]*feedback.Feedback{}, false)
+			Expect(combined.Type).To(Equal(feedback.Success))
+			Expect(combined.Emoji).To(Equal("✅"))
+		})
+
+		It("should combine all success feedback with quietSuccess=false", func() {
+			feedbacks := []*feedback.Feedback{
+				feedback.NewApprovalSuccess("alice", false),
+				feedback.NewMergeSuccess("alice", false),
+			}
+			combined := feedback.CombineFeedback(feedbacks, false)
+			Expect(combined.Type).To(Equal(feedback.Success))
+			Expect(combined.Emoji).To(Equal("✅"))
+			Expect(combined.Message).To(ContainSubstring("Approved"))
+			Expect(combined.Message).To(ContainSubstring("Merged"))
+		})
+
+		It("should combine all success feedback with quietSuccess=true", func() {
+			feedbacks := []*feedback.Feedback{
+				feedback.NewApprovalSuccess("alice", true),
+				feedback.NewMergeSuccess("alice", true),
+			}
+			combined := feedback.CombineFeedback(feedbacks, true)
+			Expect(combined.Type).To(Equal(feedback.Success))
+			Expect(combined.Emoji).To(Equal("✅"))
+			Expect(combined.Message).To(BeEmpty())
+		})
+
+		It("should combine all errors with error reaction", func() {
+			feedbacks := []*feedback.Feedback{
+				feedback.NewApprovalFailed("permission denied"),
+				feedback.NewMergeFailed("not mergeable"),
+			}
+			combined := feedback.CombineFeedback(feedbacks, false)
+			Expect(combined.Type).To(Equal(feedback.Error))
+			Expect(combined.Emoji).To(Equal("❌"))
+			Expect(combined.Message).To(ContainSubstring("permission denied"))
+			Expect(combined.Message).To(ContainSubstring("not mergeable"))
+		})
+
+		It("should use warning reaction for mixed success and error", func() {
+			feedbacks := []*feedback.Feedback{
+				feedback.NewApprovalSuccess("alice", false),
+				feedback.NewMergeFailed("merge conflicts"),
+			}
+			combined := feedback.CombineFeedback(feedbacks, false)
+			Expect(combined.Type).To(Equal(feedback.Warning))
+			Expect(combined.Emoji).To(Equal("😕"))
+			Expect(combined.Message).To(ContainSubstring("Partial Success"))
+			Expect(combined.Message).To(ContainSubstring("Approved"))
+			Expect(combined.Message).To(ContainSubstring("merge conflicts"))
+		})
+
+		It("should respect quietSuccess for mixed results", func() {
+			feedbacks := []*feedback.Feedback{
+				feedback.NewApprovalSuccess("alice", true),
+				feedback.NewMergeFailed("not mergeable"),
+			}
+			combined := feedback.CombineFeedback(feedbacks, true)
+			Expect(combined.Type).To(Equal(feedback.Warning))
+			Expect(combined.Emoji).To(Equal("😕"))
+			Expect(combined.Message).To(ContainSubstring("Partial Success"))
+			Expect(combined.Message).To(ContainSubstring("not mergeable"))
+			Expect(combined.Message).NotTo(ContainSubstring("Approved"))
+		})
+
+		It("should include warnings in mixed results", func() {
+			feedbacks := []*feedback.Feedback{
+				feedback.NewApprovalSuccess("alice", false),
+				feedback.NewAlreadyMerged(),
+			}
+			combined := feedback.CombineFeedback(feedbacks, false)
+			Expect(combined.Type).To(Equal(feedback.Warning))
+			Expect(combined.Emoji).To(Equal("😕"))
+			Expect(combined.Message).To(ContainSubstring("Partial Success"))
+		})
+	})
 })
