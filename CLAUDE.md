@@ -264,8 +264,10 @@ Steps:
 - [x] Rate limiting and retry logic (COMPLETED)
 - [x] Input validation (COMPLETED)
 - [x] Fail-closed CODEOWNERS parsing (COMPLETED)
-- [ ] Refactor global mutable state to request-scoped parameters
-- [ ] Add context.Context propagation throughout
+- [x] Refactor global mutable state to request-scoped parameters (COMPLETED - minimal state found)
+- [x] Add context.Context propagation throughout (COMPLETED - all 35+ client methods + handlers)
+- [ ] Implement structured logging with slog
+- [ ] Add request ID propagation through context
 - [ ] Add concurrency tests with `-race` flag
 - [ ] Implement comprehensive audit logging
 
