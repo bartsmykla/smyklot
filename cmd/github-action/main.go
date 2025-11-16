@@ -573,6 +573,22 @@ func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (
 		return feedback.NewNotMergeable(), nil
 	}
 
+	// Check if user already approved the PR, if not approve it first
+	alreadyApproved := false
+	for _, approver := range info.ApprovedBy {
+		if approver == runtimeConfig.CommentAuthor {
+			alreadyApproved = true
+			break
+		}
+	}
+
+	// Approve the PR if not already approved
+	if !alreadyApproved {
+		if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+			return feedback.NewApprovalFailed(err.Error()), nil
+		}
+	}
+
 	// Merge the PR
 	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, method); err != nil {
 		// If merge commits not allowed and using default merge method, try squash first
@@ -1009,6 +1025,29 @@ func handleReactionMerge(
 	// Check if PR is mergeable
 	if !info.Mergeable {
 		return postNotMergeable(client, prNum, commentID)
+	}
+
+	// Check if user already approved the PR, if not approve it first
+	alreadyApproved := false
+	for _, approver := range info.ApprovedBy {
+		if approver == author {
+			alreadyApproved = true
+			break
+		}
+	}
+
+	// Approve the PR if not already approved
+	if !alreadyApproved {
+		if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+			return postOperationFailure(
+				client,
+				prNum,
+				commentID,
+				err,
+				feedback.NewApprovalFailed,
+				ErrApprovePR,
+			)
+		}
 	}
 
 	// Merge the PR (using default merge method)
