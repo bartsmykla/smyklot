@@ -623,5 +623,63 @@ Thanks!`
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 		})
+
+		Context("when protecting against single-letter alias matches", func() {
+			cfg := &config.Config{
+				CommandPrefix: "/",
+				CommandAliases: map[string]string{
+					"a": "approve",
+					"m": "merge",
+				},
+			}
+
+			It("should NOT match single-letter bare commands in sentences", func() {
+				cmd, err := commands.ParseCommand("This is a test", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(BeEmpty())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should NOT match single-letter in multi-word context", func() {
+				cmd, err := commands.ParseCommand("I have a question", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(BeEmpty())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should match single-letter when alone on line", func() {
+				cmd, err := commands.ParseCommand("a", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should match single-letter in command-only context", func() {
+				text := `a
+m`
+				cmd, err := commands.ParseCommand(text, cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should still match multi-letter commands normally", func() {
+				cmd, err := commands.ParseCommand("This is approve and merge", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(BeEmpty())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should work with slash commands regardless", func() {
+				cmd, err := commands.ParseCommand("This is /a test", cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(1))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+		})
 	})
 })
