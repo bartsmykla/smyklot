@@ -24,7 +24,7 @@ jobs:
             .github/CODEOWNERS
 
       - name: Poll reactions on open PRs
-        uses: docker://ghcr.io/bartsmykla/smyklot:1.7.0
+        uses: docker://ghcr.io/bartsmykla/smyklot:1.7.1
         with:
           args: poll
         env:
