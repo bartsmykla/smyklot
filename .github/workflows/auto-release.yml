@@ -33,16 +33,6 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
-        with:
-          gpg_private_key: ${{ secrets.SMYKLOT_GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SMYKLOT_GPG_PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-          git_tag_gpgsign: true
-          git_config_global: true
-
       - name: Determine next version
         id: version
         uses: paulhatch/semantic-version@a8f8f59fd7f0625188492e945240f12d7ad2dca3 # v5.4.0
@@ -70,16 +60,90 @@ jobs:
             echo "needed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install mise
-        if: steps.check.outputs.needed == 'true'
-        uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
-        with:
-          cache: true
-          install_args: task
-
-      - name: Create release
+      - name: Update version files
         if: steps.check.outputs.needed == 'true'
         env:
           RELEASE_VERSION: ${{ steps.check.outputs.version }}
         run: |
-          task release "VERSION=$RELEASE_VERSION"
+          # Validate version format
+          if ! echo "$RELEASE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "❌ Invalid version format. Use semantic versioning (e.g., 1.8.0)"
+            exit 1
+          fi
+
+          # Update version in files
+          perl -i -pe "s|smyklot:[0-9]+\.[0-9]+\.[0-9]+|smyklot:$RELEASE_VERSION|g" action.yaml
+          perl -i -pe "s|smyklot:[0-9]+\.[0-9]+\.[0-9]+|smyklot:$RELEASE_VERSION|g" .github/workflows/pr-commands.yml
+          perl -i -pe "s|smyklot:[0-9]+\.[0-9]+\.[0-9]+|smyklot:$RELEASE_VERSION|g" .github/workflows/poll-reactions.yml
+
+      - name: Create verified commit via API
+        if: steps.check.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          # Get current commit SHA
+          CURRENT_SHA=$(git rev-parse HEAD)
+
+          # Create blobs for updated files
+          ACTION_BLOB=$(gh api /repos/${{ github.repository }}/git/blobs \
+            -f content=@action.yaml \
+            -f encoding=utf-8 \
+            --jq .sha)
+
+          PR_COMMANDS_BLOB=$(gh api /repos/${{ github.repository }}/git/blobs \
+            -f content=@.github/workflows/pr-commands.yml \
+            -f encoding=utf-8 \
+            --jq .sha)
+
+          POLL_REACTIONS_BLOB=$(gh api /repos/${{ github.repository }}/git/blobs \
+            -f content=@.github/workflows/poll-reactions.yml \
+            -f encoding=utf-8 \
+            --jq .sha)
+
+          # Get base tree
+          BASE_TREE=$(gh api /repos/${{ github.repository }}/git/commits/$CURRENT_SHA --jq .tree.sha)
+
+          # Create new tree
+          NEW_TREE=$(gh api /repos/${{ github.repository }}/git/trees \
+            -f base_tree="$BASE_TREE" \
+            -f "tree[][path]=action.yaml" \
+            -f "tree[][mode]=100644" \
+            -f "tree[][type]=blob" \
+            -f "tree[][sha]=$ACTION_BLOB" \
+            -f "tree[][path]=.github/workflows/pr-commands.yml" \
+            -f "tree[][mode]=100644" \
+            -f "tree[][type]=blob" \
+            -f "tree[][sha]=$PR_COMMANDS_BLOB" \
+            -f "tree[][path]=.github/workflows/poll-reactions.yml" \
+            -f "tree[][mode]=100644" \
+            -f "tree[][type]=blob" \
+            -f "tree[][sha]=$POLL_REACTIONS_BLOB" \
+            --jq .sha)
+
+          # Create commit (auto-signed by GitHub)
+          COMMIT_SHA=$(gh api /repos/${{ github.repository }}/git/commits \
+            -f message="chore(release): bump version to $RELEASE_VERSION" \
+            -f tree="$NEW_TREE" \
+            -f parents[]="$CURRENT_SHA" \
+            --jq .sha)
+
+          # Update branch reference
+          gh api /repos/${{ github.repository }}/git/refs/heads/main \
+            -f sha="$COMMIT_SHA" \
+            -X PATCH
+
+          # Create signed tag
+          gh api /repos/${{ github.repository }}/git/tags \
+            -f tag="v$RELEASE_VERSION" \
+            -f message="Release v$RELEASE_VERSION" \
+            -f object="$COMMIT_SHA" \
+            -f type=commit \
+            --jq .sha | read TAG_SHA
+
+          # Create tag reference
+          gh api /repos/${{ github.repository }}/git/refs \
+            -f ref="refs/tags/v$RELEASE_VERSION" \
+            -f sha="$COMMIT_SHA"
+
+          echo "✓ Release v$RELEASE_VERSION created and pushed"
