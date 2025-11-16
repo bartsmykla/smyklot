@@ -62,7 +62,7 @@ dockers_v2:
       org.opencontainers.image.revision: "{{.FullCommit}}"
       org.opencontainers.image.licenses: MIT
 
-checksums:
+checksum:
   name_template: 'checksums.txt'
 
 snapshot:
