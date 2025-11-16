@@ -38,10 +38,12 @@ const (
 	envGitHubAppClientID   = "GITHUB_APP_CLIENT_ID"   //nolint:gosec // Environment variable name, not a credential
 	envGitHubAppID         = "GITHUB_APP_ID"          //nolint:gosec // Environment variable name, not a credential
 	envInstallationID      = "GITHUB_INSTALLATION_ID"
+	envBotUsername         = "SMYKLOT_BOT_USERNAME"
 	envStepSummary         = "GITHUB_STEP_SUMMARY"
 	rootPath               = "/"
 	emptyBaseURL           = ""
 	summaryTemplateName    = "summary"
+	defaultBotUsername     = "smyklot[bot]" // Default GitHub App bot username
 	flagToken              = "token"
 	flagCommentBody        = "comment-body"
 	flagCommentID          = "comment-id"
@@ -117,6 +119,7 @@ type RuntimeConfig struct {
 	GitHubAppClientID   string
 	GitHubAppID         string
 	InstallationID      string
+	BotUsername         string // Bot username for identifying bot's own comments/reviews
 }
 
 // stepSummaryData holds data for the step summary template.
@@ -144,9 +147,6 @@ type stepSummaryData struct {
 }
 
 var (
-	runtimeConfig     RuntimeConfig
-	botConfig         *config.Config
-	v                 *viper.Viper
 	githubNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
 )
 
@@ -163,24 +163,16 @@ on user permissions.`,
 }
 
 func init() {
-	// Initialize Viper
-	v = viper.New()
-	config.SetupViper(v)
+	// Define CLI flags for runtime configuration
+	rootCmd.Flags().String(flagToken, "", descToken)
+	rootCmd.Flags().String(flagCommentBody, "", descCommentBody)
+	rootCmd.Flags().String(flagCommentID, "", descCommentID)
+	rootCmd.Flags().String(flagPRNumber, "", descPRNumber)
+	rootCmd.Flags().String(flagRepoOwner, "", descRepoOwner)
+	rootCmd.Flags().String(flagRepoName, "", descRepoName)
+	rootCmd.Flags().String(flagCommentAuthor, "", descCommentAuthor)
 
-	// Define CLI flags that can override environment variables
-	rootCmd.Flags().StringVar(&runtimeConfig.Token, flagToken, "", descToken)
-	rootCmd.Flags().StringVar(
-		&runtimeConfig.CommentBody, flagCommentBody, "", descCommentBody,
-	)
-	rootCmd.Flags().StringVar(&runtimeConfig.CommentID, flagCommentID, "", descCommentID)
-	rootCmd.Flags().StringVar(&runtimeConfig.PRNumber, flagPRNumber, "", descPRNumber)
-	rootCmd.Flags().StringVar(&runtimeConfig.RepoOwner, flagRepoOwner, "", descRepoOwner)
-	rootCmd.Flags().StringVar(&runtimeConfig.RepoName, flagRepoName, "", descRepoName)
-	rootCmd.Flags().StringVar(
-		&runtimeConfig.CommentAuthor, flagCommentAuthor, "", descCommentAuthor,
-	)
-
-	// Bind Viper config flags
+	// Define CLI flags for bot configuration
 	rootCmd.Flags().Bool(config.KeyQuietSuccess, false, "Disable success comments (emoji only)")
 	rootCmd.Flags().StringSlice(config.KeyAllowedCommands, []string{}, "Allowed commands (empty = all)")
 	rootCmd.Flags().StringToString(config.KeyCommandAliases, map[string]string{}, "Command aliases (JSON)")
@@ -192,21 +184,6 @@ func init() {
 	rootCmd.Flags().Bool(config.KeyDisableReactions, false, "Disable reaction-based approvals/merges")
 	rootCmd.Flags().Bool(config.KeyDisableDeletedComments, false, "Disable comments about deleted commands")
 	rootCmd.Flags().Bool(config.KeyAllowSelfApproval, false, "Allow PR authors to approve their own PRs")
-
-	// Bind flags to Viper
-	bindViperFlags([]string{
-		config.KeyQuietSuccess,
-		config.KeyAllowedCommands,
-		config.KeyCommandAliases,
-		config.KeyCommandPrefix,
-		config.KeyDisableMentions,
-		config.KeyDisableBareCommands,
-		config.KeyDisableUnapprove,
-		config.KeyQuietReactions,
-		config.KeyDisableReactions,
-		config.KeyDisableDeletedComments,
-		config.KeyAllowSelfApproval,
-	})
 }
 
 func main() {
@@ -215,45 +192,62 @@ func main() {
 	}
 }
 
-// bindViperFlags binds multiple flags to Viper
-func bindViperFlags(keys []string) {
-	for _, key := range keys {
-		_ = v.BindPFlag(key, rootCmd.Flags().Lookup(key))
-	}
-}
+func run(cmd *cobra.Command, _ []string) error {
+	// Create Viper instance
+	v := viper.New()
+	config.SetupViper(v)
 
-func run(_ *cobra.Command, _ []string) error {
-	// Load configuration from environment variables if not provided via flags
-	if err := loadConfig(); err != nil {
+	// Bind configuration flags to Viper
+	_ = v.BindPFlag(config.KeyQuietSuccess, cmd.Flags().Lookup(config.KeyQuietSuccess))
+	_ = v.BindPFlag(config.KeyAllowedCommands, cmd.Flags().Lookup(config.KeyAllowedCommands))
+	_ = v.BindPFlag(config.KeyCommandAliases, cmd.Flags().Lookup(config.KeyCommandAliases))
+	_ = v.BindPFlag(config.KeyCommandPrefix, cmd.Flags().Lookup(config.KeyCommandPrefix))
+	_ = v.BindPFlag(config.KeyDisableMentions, cmd.Flags().Lookup(config.KeyDisableMentions))
+	_ = v.BindPFlag(config.KeyDisableBareCommands, cmd.Flags().Lookup(config.KeyDisableBareCommands))
+	_ = v.BindPFlag(config.KeyDisableUnapprove, cmd.Flags().Lookup(config.KeyDisableUnapprove))
+	_ = v.BindPFlag(config.KeyQuietReactions, cmd.Flags().Lookup(config.KeyQuietReactions))
+	_ = v.BindPFlag(config.KeyDisableReactions, cmd.Flags().Lookup(config.KeyDisableReactions))
+	_ = v.BindPFlag(config.KeyDisableDeletedComments, cmd.Flags().Lookup(config.KeyDisableDeletedComments))
+	_ = v.BindPFlag(config.KeyAllowSelfApproval, cmd.Flags().Lookup(config.KeyAllowSelfApproval))
+
+	// Load runtime configuration from flags and environment
+	rc, err := loadRuntimeConfig(cmd)
+	if err != nil {
+		return err
+	}
+
+	// Load bot configuration from Viper
+	bc, err := loadBotConfig(v)
+	if err != nil {
 		return err
 	}
 
 	// Validate required configuration
-	if err := validateConfig(); err != nil {
+	if err := validateConfig(rc); err != nil {
 		return err
 	}
 
 	// Write a step summary with effective configuration
-	if err := writeStepSummary(); err != nil {
+	if err := writeStepSummary(rc, bc); err != nil {
 		// Don't fail if we can't write a summary, just log and continue
 		_, _ = fmt.Fprintf(os.Stderr, "Warning: failed to write step summary: %v\n", err)
 	}
 
 	// Handle deleted comments
-	if runtimeConfig.CommentAction == "deleted" && !botConfig.DisableDeletedComments {
-		return handleDeletedComment()
+	if rc.CommentAction == "deleted" && !bc.DisableDeletedComments {
+		return handleDeletedComment(rc, bc)
 	}
 
 	// Parse the command from the comment
-	parsedCmd, err := commands.ParseCommand(runtimeConfig.CommentBody, botConfig)
+	parsedCmd, err := commands.ParseCommand(rc.CommentBody, bc)
 	if err != nil {
 		// Not a valid command, ignore silently
 		return nil
 	}
 
 	// Get GitHub App installation token if configured
-	token := runtimeConfig.Token
-	installationToken, err := getInstallationToken()
+	token := rc.Token
+	installationToken, err := getInstallationToken(rc)
 	if err != nil {
 		return err
 	}
@@ -269,28 +263,28 @@ func run(_ *cobra.Command, _ []string) error {
 	}
 
 	// Convert string IDs to integers
-	prNum, err := strconv.Atoi(runtimeConfig.PRNumber)
+	prNum, err := strconv.Atoi(rc.PRNumber)
 	if err != nil {
-		return NewInputError(ErrInvalidInput, runtimeConfig.PRNumber, errInvalidPRNum)
+		return NewInputError(ErrInvalidInput, rc.PRNumber, errInvalidPRNum)
 	}
 
-	commentIDNum, err := strconv.Atoi(runtimeConfig.CommentID)
+	commentIDNum, err := strconv.Atoi(rc.CommentID)
 	if err != nil {
-		return NewInputError(ErrInvalidInput, runtimeConfig.CommentID, errInvalidComment)
+		return NewInputError(ErrInvalidInput, rc.CommentID, errInvalidComment)
 	}
 
 	// Clean up any previous error reactions (in case comment was edited)
 	_ = client.RemoveReaction(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		commentIDNum,
 		github.ReactionError,
 	)
 
 	// Fetch CODEOWNERS content from GitHub API
 	codeownersContent, err := client.GetCodeowners(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 	)
 	if err != nil {
 		return NewGitHubError(ErrGetCodeowners, err)
@@ -305,13 +299,13 @@ func run(_ *cobra.Command, _ []string) error {
 	// Handle help command immediately (no permission check needed)
 	for _, cmdType := range parsedCmd.Commands {
 		if cmdType == commands.CommandHelp {
-			return handleHelp(client, prNum, commentIDNum)
+			return handleHelp(client, rc, prNum, commentIDNum)
 		}
 	}
 
 	// Handle reaction-based approvals/merges if enabled
-	if !botConfig.DisableReactions {
-		if err := handleReactions(client, checker, prNum, commentIDNum); err != nil {
+	if !bc.DisableReactions {
+		if err := handleReactions(client, rc, bc, checker, prNum, commentIDNum); err != nil {
 			return err
 		}
 	}
@@ -320,9 +314,9 @@ func run(_ *cobra.Command, _ []string) error {
 	canApprove, err := checkUserPermission(
 		client,
 		checker,
-		runtimeConfig.CommentAuthor,
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.CommentAuthor,
+		rc.RepoOwner,
+		rc.RepoName,
 		rootPath,
 	)
 	if err != nil {
@@ -331,12 +325,12 @@ func run(_ *cobra.Command, _ []string) error {
 
 	// Handle unauthorized users
 	if !canApprove {
-		return handleUnauthorized(client, checker, prNum, commentIDNum)
+		return handleUnauthorized(client, rc, checker, prNum, commentIDNum)
 	}
 
 	// Execute all commands and collect feedback
 	var feedbacks []*feedback.Feedback
-	isNewComment := runtimeConfig.CommentAction == "created" || runtimeConfig.CommentAction == ""
+	isNewComment := rc.CommentAction == "created" || rc.CommentAction == ""
 
 	for _, cmdType := range parsedCmd.Commands {
 		var fb *feedback.Feedback
@@ -344,24 +338,24 @@ func run(_ *cobra.Command, _ []string) error {
 
 		switch cmdType {
 		case commands.CommandApprove:
-			fb, err = executeApprove(client, prNum)
+			fb, err = executeApprove(client, rc, bc, prNum)
 		case commands.CommandMerge:
-			fb, err = executeMerge(client, prNum, github.MergeMethodMerge)
+			fb, err = executeMerge(client, rc, bc, prNum, github.MergeMethodMerge)
 		case commands.CommandSquash:
-			fb, err = executeMerge(client, prNum, github.MergeMethodSquash)
+			fb, err = executeMerge(client, rc, bc, prNum, github.MergeMethodSquash)
 		case commands.CommandRebase:
-			fb, err = executeMerge(client, prNum, github.MergeMethodRebase)
+			fb, err = executeMerge(client, rc, bc, prNum, github.MergeMethodRebase)
 		case commands.CommandUnapprove:
-			fb, err = executeUnapprove(client, prNum)
+			fb, err = executeUnapprove(client, rc, bc, prNum)
 		case commands.CommandCleanup:
 			// Cleanup is special - it deletes the comment, so handle immediately
-			fb, err = executeCleanup(client, prNum, commentIDNum)
+			fb, err = executeCleanup(client, rc, bc, prNum, commentIDNum)
 			if err != nil {
 				return err
 			}
 			// If cleanup failed, post error feedback before returning
 			if fb.Type == feedback.Error {
-				if err := postCombinedFeedback(client, prNum, commentIDNum, fb); err != nil {
+				if err := postCombinedFeedback(client, rc, prNum, commentIDNum, fb); err != nil {
 					return err
 				}
 			}
@@ -381,7 +375,7 @@ func run(_ *cobra.Command, _ []string) error {
 		if isNewComment && fb.Type == feedback.Warning &&
 			fb.Message != "" && strings.Contains(fb.Message, "Already Approved") {
 			// Add eyes reaction to acknowledge (user already approved)
-			if err := addEyesReaction(client, commentIDNum); err != nil {
+			if err := addEyesReaction(client, rc, commentIDNum); err != nil {
 				return err
 			}
 			continue
@@ -396,40 +390,61 @@ func run(_ *cobra.Command, _ []string) error {
 	}
 
 	// Add eyes reaction to acknowledge command execution
-	if err := addEyesReaction(client, commentIDNum); err != nil {
+	if err := addEyesReaction(client, rc, commentIDNum); err != nil {
 		return err
 	}
 
 	// Combine all feedback and post once
-	combinedFeedback := feedback.CombineFeedback(feedbacks, botConfig.QuietSuccess)
+	combinedFeedback := feedback.CombineFeedback(feedbacks, bc.QuietSuccess)
 
-	return postCombinedFeedback(client, prNum, commentIDNum, combinedFeedback)
+	return postCombinedFeedback(client, rc, prNum, commentIDNum, combinedFeedback)
 }
 
-// loadConfig loads configuration from environment variables if not set via flags
-func loadConfig() error {
-	loadEnvIfEmpty(&runtimeConfig.Token, envGitHubToken)
-	loadEnvIfEmpty(&runtimeConfig.CommentBody, envCommentBody)
-	loadEnvIfEmpty(&runtimeConfig.CommentID, envCommentID)
-	loadEnvIfEmpty(&runtimeConfig.CommentAction, envCommentAction)
-	loadEnvIfEmpty(&runtimeConfig.PRNumber, envPRNumber)
-	loadEnvIfEmpty(&runtimeConfig.RepoOwner, envRepoOwner)
-	loadEnvIfEmpty(&runtimeConfig.RepoName, envRepoName)
-	loadEnvIfEmpty(&runtimeConfig.CommentAuthor, envCommentAuthor)
-	loadEnvIfEmpty(&runtimeConfig.GitHubAppPrivateKey, envGitHubAppPrivateKey)
-	loadEnvIfEmpty(&runtimeConfig.GitHubAppClientID, envGitHubAppClientID)
-	loadEnvIfEmpty(&runtimeConfig.GitHubAppID, envGitHubAppID)
-	loadEnvIfEmpty(&runtimeConfig.InstallationID, envInstallationID)
+// loadRuntimeConfig loads runtime configuration from flags and environment
+func loadRuntimeConfig(cmd *cobra.Command) (*RuntimeConfig, error) {
+	rc := &RuntimeConfig{}
 
+	// Get values from flags
+	rc.Token, _ = cmd.Flags().GetString(flagToken)
+	rc.CommentBody, _ = cmd.Flags().GetString(flagCommentBody)
+	rc.CommentID, _ = cmd.Flags().GetString(flagCommentID)
+	rc.PRNumber, _ = cmd.Flags().GetString(flagPRNumber)
+	rc.RepoOwner, _ = cmd.Flags().GetString(flagRepoOwner)
+	rc.RepoName, _ = cmd.Flags().GetString(flagRepoName)
+	rc.CommentAuthor, _ = cmd.Flags().GetString(flagCommentAuthor)
+
+	// Load from environment if not provided via flags
+	loadEnvIfEmpty(&rc.Token, envGitHubToken)
+	loadEnvIfEmpty(&rc.CommentBody, envCommentBody)
+	loadEnvIfEmpty(&rc.CommentID, envCommentID)
+	loadEnvIfEmpty(&rc.CommentAction, envCommentAction)
+	loadEnvIfEmpty(&rc.PRNumber, envPRNumber)
+	loadEnvIfEmpty(&rc.RepoOwner, envRepoOwner)
+	loadEnvIfEmpty(&rc.RepoName, envRepoName)
+	loadEnvIfEmpty(&rc.CommentAuthor, envCommentAuthor)
+	loadEnvIfEmpty(&rc.GitHubAppPrivateKey, envGitHubAppPrivateKey)
+	loadEnvIfEmpty(&rc.GitHubAppClientID, envGitHubAppClientID)
+	loadEnvIfEmpty(&rc.GitHubAppID, envGitHubAppID)
+	loadEnvIfEmpty(&rc.InstallationID, envInstallationID)
+
+	// Load bot username with default for GitHub App
+	loadEnvIfEmpty(&rc.BotUsername, envBotUsername)
+	if rc.BotUsername == "" {
+		rc.BotUsername = defaultBotUsername
+	}
+
+	return rc, nil
+}
+
+// loadBotConfig loads bot configuration from Viper
+func loadBotConfig(v *viper.Viper) (*config.Config, error) {
 	// Load JSON configuration from SMYKLOT_CONFIG if present
 	if err := config.LoadJSONConfig(v); err != nil {
-		return NewConfigError(ErrConfigLoad, err)
+		return nil, NewConfigError(ErrConfigLoad, err)
 	}
 
 	// Load bot configuration from Viper
-	botConfig = config.LoadFromViper(v)
-
-	return nil
+	return config.LoadFromViper(v), nil
 }
 
 // loadEnvIfEmpty loads environment variable into target if target is empty
@@ -440,18 +455,18 @@ func loadEnvIfEmpty(target *string, envVar string) {
 }
 
 // validateConfig validates that all required configuration is present
-func validateConfig() error {
+func validateConfig(rc *RuntimeConfig) error {
 	requiredFields := []struct {
 		value  string
 		envVar string
 	}{
-		{runtimeConfig.Token, envGitHubToken},
-		{runtimeConfig.CommentBody, envCommentBody},
-		{runtimeConfig.CommentID, envCommentID},
-		{runtimeConfig.PRNumber, envPRNumber},
-		{runtimeConfig.RepoOwner, envRepoOwner},
-		{runtimeConfig.RepoName, envRepoName},
-		{runtimeConfig.CommentAuthor, envCommentAuthor},
+		{rc.Token, envGitHubToken},
+		{rc.CommentBody, envCommentBody},
+		{rc.CommentID, envCommentID},
+		{rc.PRNumber, envPRNumber},
+		{rc.RepoOwner, envRepoOwner},
+		{rc.RepoName, envRepoName},
+		{rc.CommentAuthor, envCommentAuthor},
 	}
 
 	for _, field := range requiredFields {
@@ -461,27 +476,27 @@ func validateConfig() error {
 	}
 
 	// Validate comment body length to prevent DoS
-	if len(runtimeConfig.CommentBody) > maxCommentBodyLength {
+	if len(rc.CommentBody) > maxCommentBodyLength {
 		return NewInputError(
 			ErrInvalidInput,
-			runtimeConfig.CommentBody,
+			rc.CommentBody,
 			errCommentTooLong,
 		)
 	}
 
 	// Validate repository owner and name format
-	if !githubNamePattern.MatchString(runtimeConfig.RepoOwner) {
+	if !githubNamePattern.MatchString(rc.RepoOwner) {
 		return NewInputError(
 			ErrInvalidInput,
-			runtimeConfig.RepoOwner,
+			rc.RepoOwner,
 			errInvalidRepoName,
 		)
 	}
 
-	if !githubNamePattern.MatchString(runtimeConfig.RepoName) {
+	if !githubNamePattern.MatchString(rc.RepoName) {
 		return NewInputError(
 			ErrInvalidInput,
-			runtimeConfig.RepoName,
+			rc.RepoName,
 			errInvalidRepoName,
 		)
 	}
@@ -492,6 +507,7 @@ func validateConfig() error {
 // postFeedback posts a comment and adds a reaction to a PR.
 func postFeedback(
 	client *github.Client,
+	rc *RuntimeConfig,
 	prNum, commentID int,
 	message string,
 	reaction github.ReactionType,
@@ -499,8 +515,8 @@ func postFeedback(
 	// Only post-comment if the message is not empty
 	if message != "" {
 		if err := client.PostComment(
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			prNum,
 			message,
 		); err != nil {
@@ -510,16 +526,16 @@ func postFeedback(
 
 	// Remove eyes reaction after the operation completes
 	_ = client.RemoveReaction(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		commentID,
 		github.ReactionEyes,
 	)
 
 	// Add final status reaction
 	if err := client.AddReaction(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		commentID,
 		reaction,
 	); err != nil {
@@ -530,10 +546,10 @@ func postFeedback(
 }
 
 // addEyesReaction adds an eyes reaction to a comment to acknowledge the command.
-func addEyesReaction(client *github.Client, commentID int) error {
+func addEyesReaction(client *github.Client, rc *RuntimeConfig, commentID int) error {
 	if err := client.AddReaction(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		commentID,
 		github.ReactionEyes,
 	); err != nil {
@@ -546,6 +562,7 @@ func addEyesReaction(client *github.Client, commentID int) error {
 // postOperationFailure posts failure feedback for a failed operation.
 func postOperationFailure(
 	client *github.Client,
+	rc *RuntimeConfig,
 	prNum, commentID int,
 	operationErr error,
 	feedbackFunc func(string) *feedback.Feedback,
@@ -555,6 +572,7 @@ func postOperationFailure(
 
 	if err := postFeedback(
 		client,
+		rc,
 		prNum,
 		commentID,
 		fb.Message,
@@ -607,56 +625,57 @@ func checkUserPermission(
 // handleUnauthorized posts feedback for unauthorized users.
 func handleUnauthorized(
 	client *github.Client,
+	rc *RuntimeConfig,
 	checker *permissions.Checker,
 	prNum, commentID int,
 ) error {
-	fb := feedback.NewUnauthorized(runtimeConfig.CommentAuthor, checker.GetApprovers())
+	fb := feedback.NewUnauthorized(rc.CommentAuthor, checker.GetApprovers())
 
-	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
+	return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionError)
 }
 
 // handleApprove handles the /approve command.
 // executeApprove executes the approve command and returns feedback
 //
 //nolint:unparam // error return kept for consistent function signature
-func executeApprove(client *github.Client, prNum int) (*feedback.Feedback, error) {
+func executeApprove(client *github.Client, rc *RuntimeConfig, bc *config.Config, prNum int) (*feedback.Feedback, error) {
 	// Get PR info to check existing approvals and prevent self-approval
-	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	info, err := client.GetPRInfo(rc.RepoOwner, rc.RepoName, prNum)
 	if err != nil {
 		return feedback.NewApprovalFailed(err.Error()), nil
 	}
 
 	// Prevent self-approval unless explicitly allowed
-	if !botConfig.AllowSelfApproval && info.Author == runtimeConfig.CommentAuthor {
+	if !bc.AllowSelfApproval && info.Author == rc.CommentAuthor {
 		return feedback.NewUnauthorized(
-			runtimeConfig.CommentAuthor,
+			rc.CommentAuthor,
 			[]string{"(self-approval not allowed)"},
 		), nil
 	}
 
 	// Check if already approved by the comment author
 	for _, approver := range info.ApprovedBy {
-		if approver == runtimeConfig.CommentAuthor {
+		if approver == rc.CommentAuthor {
 			// Already approved - return feedback indicating no action needed
 			// This will be filtered out in the main loop for new comments
-			return feedback.NewAlreadyApproved(runtimeConfig.CommentAuthor), nil
+			return feedback.NewAlreadyApproved(rc.CommentAuthor), nil
 		}
 	}
 
 	// Approve the PR
-	if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+	if err := client.ApprovePR(rc.RepoOwner, rc.RepoName, prNum); err != nil {
 		return feedback.NewApprovalFailed(err.Error()), nil
 	}
 
-	return feedback.NewApprovalSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+	return feedback.NewApprovalSuccess(rc.CommentAuthor, bc.QuietSuccess), nil
 }
 
 // executeMerge executes the merge command with specified method and returns feedback
 //
 //nolint:unparam // error return kept for consistent function signature
-func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (*feedback.Feedback, error) {
+func executeMerge(client *github.Client, rc *RuntimeConfig, bc *config.Config, prNum int, method github.MergeMethod) (*feedback.Feedback, error) {
 	// Get PR info to check if it's mergeable and get base branch
-	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	info, err := client.GetPRInfo(rc.RepoOwner, rc.RepoName, prNum)
 	if err != nil {
 		return feedback.NewMergeFailed(err.Error()), nil
 	}
@@ -669,7 +688,7 @@ func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (
 	// Check if user already approved the PR, if not approve it first
 	alreadyApproved := false
 	for _, approver := range info.ApprovedBy {
-		if approver == runtimeConfig.CommentAuthor {
+		if approver == rc.CommentAuthor {
 			alreadyApproved = true
 			break
 		}
@@ -677,7 +696,7 @@ func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (
 
 	// Approve the PR if not already approved
 	if !alreadyApproved {
-		if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+		if err := client.ApprovePR(rc.RepoOwner, rc.RepoName, prNum); err != nil {
 			return feedback.NewApprovalFailed(err.Error()), nil
 		}
 	}
@@ -685,42 +704,42 @@ func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (
 	// Check if merge queue is enabled - if so, always use auto-merge
 	if info.BaseBranch != "" {
 		mergeQueueEnabled, _ := client.IsMergeQueueEnabled(
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			info.BaseBranch,
 		)
 		if mergeQueueEnabled {
-			return enableAutoMerge(client, prNum, method)
+			return enableAutoMerge(client, rc, bc, prNum, method)
 		}
 	}
 
 	// Merge the PR
-	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, method); err != nil {
+	if err := client.MergePR(rc.RepoOwner, rc.RepoName, prNum, method); err != nil {
 		// If merge commits not allowed and using default merge method, try squash first
 		if method == github.MergeMethodMerge && strings.Contains(err.Error(), "Merge commits are not allowed") {
-			if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodSquash); err != nil {
+			if err := client.MergePR(rc.RepoOwner, rc.RepoName, prNum, github.MergeMethodSquash); err != nil {
 				// Try rebase if squash also fails
-				if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodRebase); err != nil {
+				if err := client.MergePR(rc.RepoOwner, rc.RepoName, prNum, github.MergeMethodRebase); err != nil {
 					// Check if we should enable auto-merge instead
 					if shouldEnableAutoMerge(err) {
-						return enableAutoMerge(client, prNum, github.MergeMethodRebase)
+						return enableAutoMerge(client, rc, bc, prNum, github.MergeMethodRebase)
 					}
 					return feedback.NewMergeFailed(err.Error()), nil
 				}
 			}
 			// Squash succeeded
-			return feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+			return feedback.NewMergeSuccess(rc.CommentAuthor, bc.QuietSuccess), nil
 		}
 
 		// Check if we should enable auto-merge instead of failing
 		if shouldEnableAutoMerge(err) {
-			return enableAutoMerge(client, prNum, method)
+			return enableAutoMerge(client, rc, bc, prNum, method)
 		}
 
 		return feedback.NewMergeFailed(err.Error()), nil
 	}
 
-	return feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+	return feedback.NewMergeSuccess(rc.CommentAuthor, bc.QuietSuccess), nil
 }
 
 // shouldEnableAutoMerge checks if error indicates auto-merge should be enabled
@@ -736,31 +755,33 @@ func shouldEnableAutoMerge(err error) bool {
 // enableAutoMerge enables auto-merge for the PR
 func enableAutoMerge(
 	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
 	prNum int,
 	method github.MergeMethod,
 ) (*feedback.Feedback, error) {
 	if err := client.EnableAutoMerge(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		prNum,
 		method,
 	); err != nil {
 		return feedback.NewAutoMergeFailed(err.Error()), nil
 	}
 
-	return feedback.NewAutoMergeEnabled(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+	return feedback.NewAutoMergeEnabled(rc.CommentAuthor, bc.QuietSuccess), nil
 }
 
 // executeUnapprove executes the unapprove command and returns feedback
 //
 //nolint:unparam // error return kept for consistent function signature
-func executeUnapprove(client *github.Client, prNum int) (*feedback.Feedback, error) {
+func executeUnapprove(client *github.Client, rc *RuntimeConfig, bc *config.Config, prNum int) (*feedback.Feedback, error) {
 	// Dismiss the review
-	if err := client.DismissReview(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+	if err := client.DismissReview(rc.RepoOwner, rc.RepoName, prNum); err != nil {
 		return feedback.NewUnapproveFailed(err.Error()), nil
 	}
 
-	return feedback.NewUnapproveSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+	return feedback.NewUnapproveSuccess(rc.CommentAuthor, bc.QuietSuccess), nil
 }
 
 // executeCleanup executes the cleanup command and returns feedback
@@ -769,18 +790,15 @@ func executeUnapprove(client *github.Client, prNum int) (*feedback.Feedback, err
 // then deletes the triggering comment.
 //
 //nolint:unparam // error return kept for consistent function signature
-func executeCleanup(client *github.Client, prNum, commentID int) (*feedback.Feedback, error) {
-	// Get authenticated user (bot) to identify bot's comments
-	botUsername, err := client.GetAuthenticatedUser()
-	if err != nil {
-		return feedback.NewCleanupFailed(err.Error()), nil
-	}
+func executeCleanup(client *github.Client, rc *RuntimeConfig, bc *config.Config, prNum, commentID int) (*feedback.Feedback, error) {
+	// Use configured bot username to identify bot's comments
+	botUsername := rc.BotUsername
 
 	// Dismiss bot's review if present
-	_ = client.DismissReview(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	_ = client.DismissReviewByUsername(rc.RepoOwner, rc.RepoName, prNum, botUsername)
 
 	// Get all comments on the PR
-	comments, err := client.GetPRComments(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	comments, err := client.GetPRComments(rc.RepoOwner, rc.RepoName, prNum)
 	if err != nil {
 		return feedback.NewCleanupFailed(err.Error()), nil
 	}
@@ -810,13 +828,13 @@ func executeCleanup(client *github.Client, prNum, commentID int) (*feedback.Feed
 		}
 
 		// Delete bot's comment
-		_ = client.DeleteComment(runtimeConfig.RepoOwner, runtimeConfig.RepoName, commentIDInt)
+		_ = client.DeleteComment(rc.RepoOwner, rc.RepoName, commentIDInt)
 	}
 
 	// Get all reactions on the triggering comment and remove them
 	reactions, err := client.GetCommentReactions(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		commentID,
 	)
 	if err == nil {
@@ -824,8 +842,8 @@ func executeCleanup(client *github.Client, prNum, commentID int) (*feedback.Feed
 		for _, reaction := range reactions {
 			if reaction.User == botUsername {
 				_ = client.RemoveReaction(
-					runtimeConfig.RepoOwner,
-					runtimeConfig.RepoName,
+					rc.RepoOwner,
+					rc.RepoName,
 					commentID,
 					reaction.Type,
 				)
@@ -835,18 +853,18 @@ func executeCleanup(client *github.Client, prNum, commentID int) (*feedback.Feed
 
 	// Delete the triggering comment last
 	if err := client.DeleteComment(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		commentID,
 	); err != nil {
 		return feedback.NewCleanupFailed(err.Error()), nil
 	}
 
-	return feedback.NewCleanupSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+	return feedback.NewCleanupSuccess(rc.CommentAuthor, bc.QuietSuccess), nil
 }
 
 // postCombinedFeedback posts combined feedback with appropriate reaction
-func postCombinedFeedback(client *github.Client, prNum, commentID int, fb *feedback.Feedback) error {
+func postCombinedFeedback(client *github.Client, rc *RuntimeConfig, prNum, commentID int, fb *feedback.Feedback) error {
 	// Map feedback type to reaction
 	var reaction github.ReactionType
 	switch fb.Type {
@@ -863,8 +881,8 @@ func postCombinedFeedback(client *github.Client, prNum, commentID int, fb *feedb
 	// Post comment if there's a message
 	if fb.RequiresComment() {
 		if err := client.PostComment(
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			prNum,
 			fb.Message,
 		); err != nil {
@@ -874,16 +892,16 @@ func postCombinedFeedback(client *github.Client, prNum, commentID int, fb *feedb
 
 	// Remove eyes reaction before adding final status reaction
 	_ = client.RemoveReaction(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		commentID,
 		github.ReactionEyes,
 	)
 
 	// Add reaction
 	if err := client.AddReaction(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		commentID,
 		reaction,
 	); err != nil {
@@ -894,10 +912,10 @@ func postCombinedFeedback(client *github.Client, prNum, commentID int, fb *feedb
 }
 
 // handleDeletedComment posts a notification that a command comment was deleted.
-func handleDeletedComment() error {
+func handleDeletedComment(rc *RuntimeConfig, bc *config.Config) error {
 	// Get GitHub App installation token if configured
-	token := runtimeConfig.Token
-	installationToken, err := getInstallationToken()
+	token := rc.Token
+	installationToken, err := getInstallationToken(rc)
 	if err != nil {
 		return err
 	}
@@ -913,52 +931,69 @@ func handleDeletedComment() error {
 	}
 
 	// Convert PR number and comment ID
-	prNum, err := strconv.Atoi(runtimeConfig.PRNumber)
+	prNum, err := strconv.Atoi(rc.PRNumber)
 	if err != nil {
-		return NewInputError(ErrInvalidInput, runtimeConfig.PRNumber, errInvalidPRNum)
+		return NewInputError(ErrInvalidInput, rc.PRNumber, errInvalidPRNum)
 	}
 
-	commentIDNum, err := strconv.Atoi(runtimeConfig.CommentID)
+	commentIDNum, err := strconv.Atoi(rc.CommentID)
 	if err != nil {
-		return NewInputError(ErrInvalidInput, runtimeConfig.CommentID, errInvalidComment)
+		return NewInputError(ErrInvalidInput, rc.CommentID, errInvalidComment)
 	}
 
 	// Post feedback about deleted comment
-	fb := feedback.NewCommentDeleted(runtimeConfig.CommentAuthor, commentIDNum)
+	fb := feedback.NewCommentDeleted(rc.CommentAuthor, commentIDNum)
 
 	return client.PostComment(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		prNum,
 		fb.Message,
 	)
 }
 
 // handleHelp handles the /help command.
-func handleHelp(client *github.Client, prNum, commentID int) error {
+func handleHelp(client *github.Client, rc *RuntimeConfig, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
-	if err := addEyesReaction(client, commentID); err != nil {
+	if err := addEyesReaction(client, rc, commentID); err != nil {
 		return err
 	}
 
 	// Post help feedback
 	fb := feedback.NewHelp()
 
-	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+	return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
 // handleReactions processes reaction-based approvals and merges.
 func handleReactions(
 	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
 	checker *permissions.Checker,
 	prNum, commentID int,
 ) error {
-	// Fetch reactions for the comment
-	reactions, err := client.GetCommentReactions(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
-		commentID,
-	)
+	// Fetch reactions - use PR reactions if commentID equals prNum (PR description),
+	// otherwise get comment reactions
+	var reactions []github.Reaction
+	var err error
+
+	if commentID == prNum {
+		// Get reactions on the PR description
+		reactions, err = client.GetPRReactions(
+			rc.RepoOwner,
+			rc.RepoName,
+			prNum,
+		)
+	} else {
+		// Get reactions on a comment
+		reactions, err = client.GetCommentReactions(
+			rc.RepoOwner,
+			rc.RepoName,
+			commentID,
+		)
+	}
+
 	if err != nil {
 		// Don't fail if we can't fetch reactions, just skip
 		return nil
@@ -966,8 +1001,8 @@ func handleReactions(
 
 	// Fetch current PR labels
 	labels, err := client.GetLabels(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		prNum,
 	)
 	if err != nil {
@@ -985,8 +1020,8 @@ func handleReactions(
 			client,
 			checker,
 			reaction.User,
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			rootPath,
 		)
 		if err != nil || !canApprove {
@@ -1003,6 +1038,8 @@ func handleReactions(
 	// Handle removed reactions (reconciliation)
 	if err := handleRemovedReactions(
 		client,
+		rc,
+		bc,
 		prNum,
 		reactionMap,
 		labelMap,
@@ -1017,8 +1054,8 @@ func handleReactions(
 			client,
 			checker,
 			reaction.User,
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			rootPath,
 		)
 		if err != nil || !canApprove {
@@ -1027,21 +1064,21 @@ func handleReactions(
 
 		// Handle approve reaction
 		if reaction.Type == github.ReactionApprove {
-			if err := handleReactionApprove(client, prNum, commentID, reaction.User); err != nil {
+			if err := handleReactionApprove(client, rc, bc, checker, prNum, commentID, reaction.User); err != nil {
 				return err
 			}
 		}
 
 		// Handle merge reaction
 		if reaction.Type == github.ReactionMerge {
-			if err := handleReactionMerge(client, prNum, commentID, reaction.User); err != nil {
+			if err := handleReactionMerge(client, rc, bc, prNum, commentID, reaction.User); err != nil {
 				return err
 			}
 		}
 
 		// Handle cleanup reaction
 		if reaction.Type == github.ReactionCleanup {
-			if err := handleReactionCleanup(client, prNum, commentID); err != nil {
+			if err := handleReactionCleanup(client, rc, bc, prNum, commentID); err != nil {
 				return err
 			}
 		}
@@ -1053,6 +1090,8 @@ func handleReactions(
 // handleRemovedReactions handles reactions that were removed.
 func handleRemovedReactions(
 	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
 	prNum int,
 	reactionMap map[github.ReactionType]bool,
 	labelMap map[string]bool,
@@ -1060,10 +1099,11 @@ func handleRemovedReactions(
 	// Check if approve reaction was removed
 	if labelMap[github.LabelReactionApprove] && !reactionMap[github.ReactionApprove] {
 		// Approve reaction was removed, unapprove the PR
-		if err := client.DismissReview(
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+		if err := client.DismissReviewByUsername(
+			rc.RepoOwner,
+			rc.RepoName,
 			prNum,
+			rc.BotUsername,
 		); err != nil {
 			// Don't fail, just log
 			_, _ = fmt.Fprintf(
@@ -1075,8 +1115,8 @@ func handleRemovedReactions(
 
 		// Remove the label
 		_ = client.RemoveLabel(
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			prNum,
 			github.LabelReactionApprove,
 		)
@@ -1086,8 +1126,8 @@ func handleRemovedReactions(
 	if labelMap[github.LabelReactionMerge] && !reactionMap[github.ReactionMerge] {
 		// Get PR info to check if it's already merged
 		info, err := client.GetPRInfo(
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			prNum,
 		)
 		if err != nil {
@@ -1102,11 +1142,11 @@ func handleRemovedReactions(
 
 		// If PR is already merged, post warning (unless disabled)
 		if info.State == "closed" {
-			if !botConfig.QuietReactions {
+			if !bc.QuietReactions {
 				fb := feedback.NewReactionMergeRemoved()
 				_ = client.PostComment(
-					runtimeConfig.RepoOwner,
-					runtimeConfig.RepoName,
+					rc.RepoOwner,
+					rc.RepoName,
 					prNum,
 					fb.Message,
 				)
@@ -1115,8 +1155,8 @@ func handleRemovedReactions(
 
 		// Remove the label
 		_ = client.RemoveLabel(
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			prNum,
 			github.LabelReactionMerge,
 		)
@@ -1127,8 +1167,8 @@ func handleRemovedReactions(
 		// Cleanup reaction was removed, just remove the label
 		// (no action needed since cleanup is one-time operation)
 		_ = client.RemoveLabel(
-			runtimeConfig.RepoOwner,
-			runtimeConfig.RepoName,
+			rc.RepoOwner,
+			rc.RepoName,
 			prNum,
 			github.LabelReactionCleanup,
 		)
@@ -1140,14 +1180,18 @@ func handleRemovedReactions(
 // handleReactionApprove handles approval via 👍 reaction.
 func handleReactionApprove(
 	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
+	checker *permissions.Checker,
 	prNum, commentID int,
 	approver string,
 ) error {
 	// Get PR info to check existing approvals and prevent self-approval
-	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	info, err := client.GetPRInfo(rc.RepoOwner, rc.RepoName, prNum)
 	if err != nil {
 		return postOperationFailure(
 			client,
+			rc,
 			prNum,
 			commentID,
 			err,
@@ -1157,9 +1201,9 @@ func handleReactionApprove(
 	}
 
 	// Prevent self-approval unless explicitly allowed
-	if !botConfig.AllowSelfApproval && info.Author == approver {
+	if !bc.AllowSelfApproval && info.Author == approver {
 		fb := feedback.NewUnauthorized(approver, []string{"(self-approval not allowed)"})
-		return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
+		return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionError)
 	}
 
 	// Get authenticated user (bot) to check if already approved
@@ -1167,6 +1211,7 @@ func handleReactionApprove(
 	if err != nil {
 		return postOperationFailure(
 			client,
+			rc,
 			prNum,
 			commentID,
 			err,
@@ -1180,8 +1225,8 @@ func handleReactionApprove(
 		if existingApprover == botUsername {
 			// Already approved - skip approval but still add label
 			_ = client.AddLabel(
-				runtimeConfig.RepoOwner,
-				runtimeConfig.RepoName,
+				rc.RepoOwner,
+				rc.RepoName,
 				prNum,
 				github.LabelReactionApprove,
 			)
@@ -1190,9 +1235,10 @@ func handleReactionApprove(
 	}
 
 	// Approve the PR
-	if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+	if err := client.ApprovePR(rc.RepoOwner, rc.RepoName, prNum); err != nil {
 		return postOperationFailure(
 			client,
+			rc,
 			prNum,
 			commentID,
 			err,
@@ -1203,29 +1249,32 @@ func handleReactionApprove(
 
 	// Add label to track reaction-based approval
 	_ = client.AddLabel(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		prNum,
 		github.LabelReactionApprove,
 	)
 
 	// Post success feedback
-	fb := feedback.NewReactionApprovalSuccess(approver, botConfig.QuietReactions)
+	fb := feedback.NewReactionApprovalSuccess(approver, bc.QuietReactions)
 
-	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+	return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
 // handleReactionMerge handles merge via 🚀 reaction.
 func handleReactionMerge(
 	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
 	prNum, commentID int,
 	author string,
 ) error {
 	// Get PR info to check if it's mergeable and prevent self-approval
-	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
+	info, err := client.GetPRInfo(rc.RepoOwner, rc.RepoName, prNum)
 	if err != nil {
 		return postOperationFailure(
 			client,
+			rc,
 			prNum,
 			commentID,
 			err,
@@ -1235,14 +1284,14 @@ func handleReactionMerge(
 	}
 
 	// Prevent self-approval unless explicitly allowed (merge also approves)
-	if !botConfig.AllowSelfApproval && info.Author == author {
+	if !bc.AllowSelfApproval && info.Author == author {
 		fb := feedback.NewUnauthorized(author, []string{"(self-approval not allowed)"})
-		return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
+		return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionError)
 	}
 
 	// Check if PR is mergeable
 	if !info.Mergeable {
-		return postNotMergeable(client, prNum, commentID)
+		return postNotMergeable(client, rc, prNum, commentID)
 	}
 
 	// Check if user already approved the PR, if not approve it first
@@ -1256,9 +1305,10 @@ func handleReactionMerge(
 
 	// Approve the PR if not already approved
 	if !alreadyApproved {
-		if err := client.ApprovePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum); err != nil {
+		if err := client.ApprovePR(rc.RepoOwner, rc.RepoName, prNum); err != nil {
 			return postOperationFailure(
 				client,
+				rc,
 				prNum,
 				commentID,
 				err,
@@ -1269,17 +1319,18 @@ func handleReactionMerge(
 	}
 
 	// Merge the PR (using default merge method)
-	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodMerge); err != nil {
+	if err := client.MergePR(rc.RepoOwner, rc.RepoName, prNum, github.MergeMethodMerge); err != nil {
 		// Check if we should enable auto-merge instead
 		if shouldEnableAutoMerge(err) {
 			if err := client.EnableAutoMerge(
-				runtimeConfig.RepoOwner,
-				runtimeConfig.RepoName,
+				rc.RepoOwner,
+				rc.RepoName,
 				prNum,
 				github.MergeMethodMerge,
 			); err != nil {
 				return postOperationFailure(
 					client,
+					rc,
 					prNum,
 					commentID,
 					err,
@@ -1290,19 +1341,20 @@ func handleReactionMerge(
 
 			// Add label to track reaction-based auto-merge
 			_ = client.AddLabel(
-				runtimeConfig.RepoOwner,
-				runtimeConfig.RepoName,
+				rc.RepoOwner,
+				rc.RepoName,
 				prNum,
 				github.LabelReactionMerge,
 			)
 
 			// Post auto-merge enabled feedback
-			fb := feedback.NewAutoMergeEnabled(author, botConfig.QuietReactions)
-			return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+			fb := feedback.NewAutoMergeEnabled(author, bc.QuietReactions)
+			return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionSuccess)
 		}
 
 		return postOperationFailure(
 			client,
+			rc,
 			prNum,
 			commentID,
 			err,
@@ -1313,39 +1365,41 @@ func handleReactionMerge(
 
 	// Add label to track reaction-based merge
 	_ = client.AddLabel(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		prNum,
 		github.LabelReactionMerge,
 	)
 
 	// Post success feedback
-	fb := feedback.NewReactionMergeSuccess(author, botConfig.QuietReactions)
+	fb := feedback.NewReactionMergeSuccess(author, bc.QuietReactions)
 
-	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+	return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
 // handleReactionCleanup handles cleanup via ❤️ reaction.
 func handleReactionCleanup(
 	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
 	prNum, commentID int,
 ) error {
 	// Execute cleanup
-	fb, err := executeCleanup(client, prNum, commentID)
+	fb, err := executeCleanup(client, rc, bc, prNum, commentID)
 	if err != nil {
 		return err
 	}
 
 	// If cleanup failed, post error feedback
 	if fb.Type == feedback.Error {
-		return postFeedback(client, prNum, commentID, fb.Message, github.ReactionError)
+		return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionError)
 	}
 
 	// Cleanup succeeded - the comment and reactions are already deleted by executeCleanup
 	// Remove the label to track that cleanup completed
 	_ = client.RemoveLabel(
-		runtimeConfig.RepoOwner,
-		runtimeConfig.RepoName,
+		rc.RepoOwner,
+		rc.RepoName,
 		prNum,
 		github.LabelReactionCleanup,
 	)
@@ -1354,10 +1408,10 @@ func handleReactionCleanup(
 }
 
 // postNotMergeable posts feedback when PR is not mergeable.
-func postNotMergeable(client *github.Client, prNum, commentID int) error {
+func postNotMergeable(client *github.Client, rc *RuntimeConfig, prNum, commentID int) error {
 	fb := feedback.NewNotMergeable()
 
-	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionWarning)
+	return postFeedback(client, rc, prNum, commentID, fb.Message, github.ReactionWarning)
 }
 
 // sanitizeCommentBody redacts sensitive information from comment body
@@ -1378,16 +1432,16 @@ func sanitizeCommentBody(body string, maxLen int) string {
 //
 // Returns an empty string if GitHub App credentials are not configured.
 // Returns the token on success.
-func getInstallationToken() (string, error) {
+func getInstallationToken(rc *RuntimeConfig) (string, error) {
 	// Check if GitHub App credentials are provided
-	if runtimeConfig.GitHubAppPrivateKey == "" || runtimeConfig.InstallationID == "" {
+	if rc.GitHubAppPrivateKey == "" || rc.InstallationID == "" {
 		return "", nil
 	}
 
 	// Determine which ID to use (ClientID is preferred, fallback to AppID)
-	clientID := runtimeConfig.GitHubAppClientID
+	clientID := rc.GitHubAppClientID
 	if clientID == "" {
-		clientID = runtimeConfig.GitHubAppID
+		clientID = rc.GitHubAppID
 	}
 
 	if clientID == "" {
@@ -1395,15 +1449,15 @@ func getInstallationToken() (string, error) {
 	}
 
 	// Convert installation ID to int64
-	installationID, err := strconv.ParseInt(runtimeConfig.InstallationID, 10, 64)
+	installationID, err := strconv.ParseInt(rc.InstallationID, 10, 64)
 	if err != nil {
-		return "", NewInputError(ErrInvalidInput, runtimeConfig.InstallationID, errInvalidInstallID)
+		return "", NewInputError(ErrInvalidInput, rc.InstallationID, errInvalidInstallID)
 	}
 
 	// Create GitHub App JWT token source
 	appTokenSource, err := githubauth.NewApplicationTokenSource(
 		clientID,
-		[]byte(runtimeConfig.GitHubAppPrivateKey),
+		[]byte(rc.GitHubAppPrivateKey),
 	)
 	if err != nil {
 		return "", NewGitHubError(ErrGitHubAppAuth, err)
@@ -1425,7 +1479,7 @@ func getInstallationToken() (string, error) {
 }
 
 // writeStepSummary writes the effective configuration to GitHub Actions step summary.
-func writeStepSummary() error {
+func writeStepSummary(rc *RuntimeConfig, bc *config.Config) error {
 	summaryFile := os.Getenv(envStepSummary)
 	if summaryFile == "" {
 		// Not running in GitHub Actions, skip
@@ -1447,31 +1501,31 @@ func writeStepSummary() error {
 	}
 
 	var allowedCommands string
-	if len(botConfig.AllowedCommands) > 0 {
-		allowedCommands = strings.Join(botConfig.AllowedCommands, ", ")
+	if len(bc.AllowedCommands) > 0 {
+		allowedCommands = strings.Join(bc.AllowedCommands, ", ")
 	}
 
 	data := stepSummaryData{
-		RepoOwner:              runtimeConfig.RepoOwner,
-		RepoName:               runtimeConfig.RepoName,
-		PRNumber:               runtimeConfig.PRNumber,
-		CommentID:              runtimeConfig.CommentID,
-		CommentAuthor:          runtimeConfig.CommentAuthor,
-		CommentBody:            sanitizeCommentBody(runtimeConfig.CommentBody, 100),
-		GitHubApp:              runtimeConfig.GitHubAppPrivateKey != "",
-		AppID:                  runtimeConfig.GitHubAppID,
-		InstallationID:         runtimeConfig.InstallationID,
-		QuietSuccess:           botConfig.QuietSuccess,
-		QuietReactions:         botConfig.QuietReactions,
-		CommandPrefix:          botConfig.CommandPrefix,
-		DisableMentions:        botConfig.DisableMentions,
-		DisableBareCommands:    botConfig.DisableBareCommands,
-		DisableUnapprove:       botConfig.DisableUnapprove,
-		DisableReactions:       botConfig.DisableReactions,
-		DisableDeletedComments: botConfig.DisableDeletedComments,
-		AllowSelfApproval:      botConfig.AllowSelfApproval,
+		RepoOwner:              rc.RepoOwner,
+		RepoName:               rc.RepoName,
+		PRNumber:               rc.PRNumber,
+		CommentID:              rc.CommentID,
+		CommentAuthor:          rc.CommentAuthor,
+		CommentBody:            sanitizeCommentBody(rc.CommentBody, 100),
+		GitHubApp:              rc.GitHubAppPrivateKey != "",
+		AppID:                  rc.GitHubAppID,
+		InstallationID:         rc.InstallationID,
+		QuietSuccess:           bc.QuietSuccess,
+		QuietReactions:         bc.QuietReactions,
+		CommandPrefix:          bc.CommandPrefix,
+		DisableMentions:        bc.DisableMentions,
+		DisableBareCommands:    bc.DisableBareCommands,
+		DisableUnapprove:       bc.DisableUnapprove,
+		DisableReactions:       bc.DisableReactions,
+		DisableDeletedComments: bc.DisableDeletedComments,
+		AllowSelfApproval:      bc.AllowSelfApproval,
 		AllowedCommands:        allowedCommands,
-		CommandAliases:         botConfig.CommandAliases,
+		CommandAliases:         bc.CommandAliases,
 	}
 
 	if err := tmpl.Execute(file, data); err != nil {

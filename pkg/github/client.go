@@ -150,13 +150,22 @@ func (c *Client) ApprovePR(owner, repo string, prNumber int) error {
 
 // DismissReview dismisses all approved reviews by the authenticated user
 //
-// This finds all APPROVED reviews by the authenticated user and dismisses them.
+// WARNING: This method calls GET /user which requires special permissions
+// not granted to GitHub App installation tokens. Use DismissReviewByUsername instead.
 func (c *Client) DismissReview(owner, repo string, prNumber int) error {
 	username, err := c.GetAuthenticatedUser()
 	if err != nil {
 		return err
 	}
 
+	return c.DismissReviewByUsername(owner, repo, prNumber, username)
+}
+
+// DismissReviewByUsername dismisses all approved reviews by the specified username
+//
+// This finds all APPROVED reviews by the specified user and dismisses them.
+// Recommended for GitHub App installations to avoid GET /user permission issues.
+func (c *Client) DismissReviewByUsername(owner, repo string, prNumber int, username string) error {
 	reviews, err := c.getPullRequestReviews(owner, repo, prNumber)
 	if err != nil {
 		return err
@@ -331,6 +340,45 @@ func (c *Client) EnableAutoMerge(owner, repo string, prNumber int, method MergeM
 
 	_, err = c.makeRequest("POST", graphqlPath, query)
 	return err
+}
+
+// GetPRReactions retrieves all reactions for a pull request (issue)
+//
+// Returns a slice of Reaction structs containing user and reaction type information.
+// This gets reactions on the PR description/body, not on comments.
+func (c *Client) GetPRReactions(owner, repo string, prNumber int) ([]Reaction, error) {
+	path := fmt.Sprintf("/repos/%s/%s/issues/%d/reactions", owner, repo, prNumber)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var rawReactions []map[string]interface{}
+	if err := json.Unmarshal(data, &rawReactions); err != nil {
+		return nil, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	reactions := make([]Reaction, 0, len(rawReactions))
+	for _, r := range rawReactions {
+		reaction := Reaction{}
+
+		if content, ok := r["content"].(string); ok {
+			reaction.Type = ReactionType(content)
+		}
+
+		if user, ok := r["user"].(map[string]interface{}); ok {
+			if login, ok := user["login"].(string); ok {
+				reaction.User = login
+			}
+		}
+
+		if reaction.Type != "" && reaction.User != "" {
+			reactions = append(reactions, reaction)
+		}
+	}
+
+	return reactions, nil
 }
 
 // GetCommentReactions retrieves all reactions for a comment

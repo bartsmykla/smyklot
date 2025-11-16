@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/bartsmykla/smyklot/pkg/config"
 	"github.com/bartsmykla/smyklot/pkg/github"
@@ -41,13 +42,26 @@ func init() {
 }
 
 func runPoll(cmd *cobra.Command, _ []string) error {
+	// Create Viper instance
+	v := viper.New()
+	config.SetupViper(v)
+
+	// Create runtime config for GitHub App auth
+	rc := &RuntimeConfig{}
+	loadEnvIfEmpty(&rc.Token, envGitHubToken)
+	loadEnvIfEmpty(&rc.GitHubAppPrivateKey, envGitHubAppPrivateKey)
+	loadEnvIfEmpty(&rc.GitHubAppClientID, envGitHubAppClientID)
+	loadEnvIfEmpty(&rc.GitHubAppID, envGitHubAppID)
+	loadEnvIfEmpty(&rc.InstallationID, envInstallationID)
+
 	// Load bot configuration
-	if err := loadPollBotConfig(); err != nil {
+	bc, err := loadPollBotConfig(v)
+	if err != nil {
 		return err
 	}
 
 	// Get configuration from flags and environment
-	repo, token, err := getPollConfig(cmd)
+	repo, token, err := getPollConfig(cmd, rc)
 	if err != nil {
 		return err
 	}
@@ -65,24 +79,22 @@ func runPoll(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Poll and process all open PRs
-	return pollAllPRs(client, checker, repoOwner, repoName)
+	return pollAllPRs(client, checker, bc, repoOwner, repoName)
 }
 
 // loadPollBotConfig loads bot configuration from JSON config and Viper
-func loadPollBotConfig() error {
+func loadPollBotConfig(v *viper.Viper) (*config.Config, error) {
 	// Load JSON configuration from SMYKLOT_CONFIG if present
 	if err := config.LoadJSONConfig(v); err != nil {
-		return NewConfigError(ErrConfigLoad, err)
+		return nil, NewConfigError(ErrConfigLoad, err)
 	}
 
 	// Load bot configuration from Viper
-	botConfig = config.LoadFromViper(v)
-
-	return nil
+	return config.LoadFromViper(v), nil
 }
 
 // getPollConfig retrieves repo and token from flags or environment
-func getPollConfig(cmd *cobra.Command) (string, string, error) {
+func getPollConfig(cmd *cobra.Command, rc *RuntimeConfig) (string, string, error) {
 	repo, err := cmd.Flags().GetString(flagPollRepo)
 	if err != nil {
 		return "", "", err
@@ -108,7 +120,7 @@ func getPollConfig(cmd *cobra.Command) (string, string, error) {
 		token = os.Getenv(envGitHubToken)
 		if token == "" {
 			// Try GitHub App auth
-			installationToken, err := getInstallationToken()
+			installationToken, err := getInstallationToken(rc)
 			if err != nil {
 				return "", "", err
 			}
@@ -164,13 +176,14 @@ func setupPollClients(
 	return client, checker, nil
 }
 
-// pollAllPRs polls and processes all open PRs
+// pollAllPRs polls and processes reactions on all open PRs
 func pollAllPRs(
 	client *github.Client,
 	checker *permissions.Checker,
+	bc *config.Config,
 	repoOwner, repoName string,
 ) error {
-	fmt.Printf("Polling reactions on open PRs in %s/%s\n", repoOwner, repoName)
+	fmt.Printf("Polling PR reactions in %s/%s\n", repoOwner, repoName)
 
 	// Get all open PRs
 	prs, err := client.GetOpenPRs(repoOwner, repoName)
@@ -185,9 +198,9 @@ func pollAllPRs(
 
 	fmt.Printf("Found %d open PR(s)\n", len(prs))
 
-	// Process each PR
+	// Process reactions on each PR
 	for _, pr := range prs {
-		if err := processPR(client, checker, repoOwner, repoName, pr); err != nil {
+		if err := processPR(client, checker, bc, repoOwner, repoName, pr); err != nil {
 			fmt.Fprintf(os.Stderr, "  Warning: %v\n", err)
 		}
 	}
@@ -197,10 +210,11 @@ func pollAllPRs(
 	return nil
 }
 
-// processPR processes reactions on all comments in a single PR
+// processPR processes reactions on a single PR
 func processPR(
 	client *github.Client,
 	checker *permissions.Checker,
+	bc *config.Config,
 	repoOwner, repoName string,
 	pr map[string]interface{},
 ) error {
@@ -212,102 +226,36 @@ func processPR(
 
 	fmt.Printf("\nProcessing PR #%d\n", prNumber)
 
-	// Get all comments on the PR
-	comments, err := client.GetPRComments(repoOwner, repoName, prNumber)
-	if err != nil {
-		return fmt.Errorf("failed to get comments for PR #%d: %w", prNumber, err)
-	}
-
-	if len(comments) == 0 {
-		fmt.Printf("  No comments on PR #%d\n", prNumber)
-		return nil
-	}
-
-	fmt.Printf("  Found %d comment(s)\n", len(comments))
-
-	// Process each comment
-	for _, comment := range comments {
-		if err := processComment(client, checker, repoOwner, repoName, prNumber, comment); err != nil {
-			fmt.Fprintf(os.Stderr, "    Warning: %v\n", err)
+	// Get PR author and title for RuntimeConfig
+	var author, title string
+	if user, ok := pr["user"].(map[string]interface{}); ok {
+		if login, ok := user["login"].(string); ok {
+			author = login
 		}
 	}
-
-	return nil
-}
-
-// processComment processes reactions on a single comment
-func processComment(
-	client *github.Client,
-	checker *permissions.Checker,
-	repoOwner, repoName string,
-	prNumber int,
-	comment map[string]interface{},
-) error {
-	commentIDFloat, ok := comment["id"].(float64)
-	if !ok {
-		return fmt.Errorf("invalid comment ID")
-	}
-	commentID := int(commentIDFloat)
-
-	user, ok := comment["user"].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid user data")
+	if t, ok := pr["title"].(string); ok {
+		title = t
 	}
 
-	author, ok := user["login"].(string)
-	if !ok {
-		return fmt.Errorf("invalid author login")
-	}
-
-	body, ok := comment["body"].(string)
-	if !ok {
-		body = ""
-	}
-
-	fmt.Printf("  Processing comment %d by %s\n", commentID, author)
-
-	// Process reactions on this comment
-	if err := pollCommentReactions(
-		client,
-		checker,
-		repoOwner,
-		repoName,
-		prNumber,
-		commentID,
-		author,
-		body,
-	); err != nil {
-		return fmt.Errorf("failed to process reactions on comment %d: %w", commentID, err)
-	}
-
-	return nil
-}
-
-// pollCommentReactions checks and processes reactions on a specific comment
-func pollCommentReactions(
-	client *github.Client,
-	checker *permissions.Checker,
-	repoOwner, repoName string,
-	prNumber, commentID int,
-	author, body string,
-) error {
-	// Set runtime config for this comment
-	runtimeConfig = RuntimeConfig{
-		CommentBody:   body,
-		CommentID:     strconv.Itoa(commentID),
+	// Create request-scoped runtime config for this PR
+	rc := &RuntimeConfig{
+		CommentBody:   title, // Use PR title as body
+		CommentID:     strconv.Itoa(prNumber),
 		CommentAction: "created",
 		PRNumber:      strconv.Itoa(prNumber),
 		RepoOwner:     repoOwner,
 		RepoName:      repoName,
 		CommentAuthor: author,
+		BotUsername:   defaultBotUsername, // Use default bot username
 	}
 
 	// Process reactions if not disabled
-	if !botConfig.DisableReactions {
-		if err := handleReactions(client, checker, prNumber, commentID); err != nil {
-			return err
+	if !bc.DisableReactions {
+		if err := handleReactions(client, rc, bc, checker, prNumber, prNumber); err != nil {
+			return fmt.Errorf("failed to process reactions on PR #%d: %w", prNumber, err)
 		}
 	}
 
 	return nil
 }
+
