@@ -153,10 +153,18 @@
   - See Phase 2 in README.md for full scope
 
 - [ ] **Webhook-based deployment (Phase 3)**
+  - **Platform**: Fly.io (decided)
   - Real-time reaction processing (no polling delay)
-  - Deploy to Kubernetes/serverless
   - HTTP webhook server
+  - No cold starts for instant webhook response
+  - Simple Dockerfile-based deployment
+  - Built-in observability
+  - Free tier sufficient for personal use
   - See Phase 3 in README.md for architecture
+  - **Setup**:
+    1. Create `fly.toml` configuration
+    2. Deploy: `fly launch --name smyklot-webhook && fly deploy`
+    3. Configure webhook URL: `https://smyklot-webhook.fly.dev`
 
 - [ ] **Advanced auto-merge features**
   - Smart merge method selection based on PR size
