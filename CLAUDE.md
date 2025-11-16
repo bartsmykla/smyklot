@@ -4,12 +4,13 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-Smyklot is a GitHub Actions bot for automated PR approvals and merges
-based on CODEOWNERS files. It's built in Go using TDD methodology with
-Ginkgo/Gomega.
+Smyklot is a GitHub App for automated PR approvals and merges based on
+CODEOWNERS files. It supports comment-based commands and reaction-based
+approvals (👍/🚀). Built in Go using TDD methodology with Ginkgo/Gomega.
 
-**Current Status**: Phase 1 complete (GitHub Actions implementation)
-**Test Coverage**: 130/130 tests passing (100%)
+**Current Status**: Phase 1 complete (Docker-based GitHub Action)
+**Test Coverage**: 130+ tests passing
+**Deployment**: Docker image published to ghcr.io
 
 ## Architecture
 
@@ -27,12 +28,15 @@ Ginkgo/Gomega.
 smyklot/
 ├── cmd/github-action/       # GitHub Actions entrypoint binary
 ├── pkg/
-│   ├── commands/            # Command parser (slash + mention)
+│   ├── commands/            # Command parser (slash, mention, bare)
+│   ├── config/              # Configuration management (Viper)
 │   ├── permissions/         # CODEOWNERS parser & permission checker
 │   ├── feedback/            # User feedback system (emoji + comments)
 │   └── github/              # GitHub API client
 ├── .github/workflows/       # CI/CD workflows
+├── .goreleaser.yml          # GoReleaser v2 configuration
 ├── .mise.toml               # Tool versions (pinned)
+├── Dockerfile               # Docker image for GitHub Action
 ├── Taskfile.yaml            # Task automation
 └── go.mod                   # Go dependencies
 ```
@@ -42,13 +46,12 @@ smyklot/
 #### `pkg/commands`
 
 - Parses commands from PR comments
-- Supports slash (`/approve`), mention (`@smyklot approve`), and bare
-  (`approve`, `accept`, `lgtm`, `merge`) command formats
+- **Commands**: `approve` (aliases: `lgtm`, `accept`), `merge`, `unapprove`, `help`
+- **Formats**: Slash (`/approve`), mention (`@smyklot approve`), bare (`lgtm`, `merge`)
 - **Multi-command support**: Parse multiple commands in single comment
-  (`approve merge`, `lgtm\nmerge`)
-- Three formats: slash, mention, bare (word-based matching)
+- **Configurable**: Custom aliases, prefix, disable specific formats
 - Returns `Command` type with parsed actions
-- 52 tests covering all parsing scenarios including multi-command
+- 52+ tests covering all parsing scenarios including multi-command
 
 #### `pkg/permissions`
 
@@ -57,19 +60,29 @@ smyklot/
 - **Phase 2**: Path-specific patterns (future)
 - 42 tests (12 parser + 30 checker)
 
+#### `pkg/config`
+
+- Configuration management using Viper
+- **Sources**: CLI flags > Environment variables > Repository variables > Defaults
+- **JSON support**: Full configuration via `SMYKLOT_CONFIG` variable
+- **Individual variables**: `SMYKLOT_*` prefix for each setting
+- **Options**: quiet modes, command restrictions, custom aliases, format toggles
+
 #### `pkg/feedback`
 
 - Creates user feedback messages
-- Emoji reactions: ✅ (success), ❌ (error), ⚠️ (warning)
+- Emoji reactions: ✅ (success), ❌ (error), ⚠️ (warning), 👀 (processing)
 - Comments for errors/warnings only
 - 30 tests covering all feedback types
 
 #### `pkg/github`
 
 - GitHub API client
-- Methods: `AddReaction`, `PostComment`, `ApprovePR`, `MergePR`, `GetPRInfo`
-- Uses `GITHUB_TOKEN` from environment
-- 18 tests with httptest mocking
+- **Methods**: `AddReaction`, `RemoveReaction`, `PostComment`, `ApprovePR`,
+  `MergePR`, `GetPRInfo`, `GetCodeowners`, `GetCommentReactions`, `GetLabels`
+- **Reaction support**: 👍 (approve), 🚀 (merge), with removal tracking
+- Uses GitHub App token from environment
+- 18+ tests with httptest mocking
 
 ## Development Workflow
 
@@ -188,19 +201,28 @@ Steps:
 
 ## Current Implementation
 
-### Phase 1: GitHub Actions Bot ✅
+### Phase 1: Docker-based GitHub Action ✅
 
 **Completed**:
 
-- [x] Command parser (slash, mention, and bare commands)
+- [x] Command parser (slash, mention, bare formats)
+- [x] Commands: `approve`, `merge`, `unapprove`, `help` with aliases
 - [x] Multi-command support (multiple commands in single comment)
+- [x] Reaction-based approvals/merges (👍 approve, 🚀 merge)
+- [x] Reaction removal tracking (auto-remove approvals/merges)
+- [x] Comment edit/delete handling
 - [x] CODEOWNERS parser (global owners only)
+- [x] CODEOWNERS API fetching (no repository checkout)
 - [x] Permission checker (global ownership)
+- [x] Configuration system (Viper with JSON/individual variables)
 - [x] Feedback system (reactions + comments)
-- [x] GitHub API client (approve, merge, reactions)
-- [x] GitHub Actions workflows
-- [x] Documentation (README, CLAUDE.md)
-- [x] 130 tests passing (100% coverage)
+- [x] GitHub API client (full CRUD operations)
+- [x] GitHub App integration with token generation
+- [x] Docker-based GitHub Action (ghcr.io)
+- [x] GoReleaser v2 automated releases
+- [x] GitHub Actions workflows (test, release)
+- [x] Documentation (README, CLAUDE.md, GitHub App description)
+- [x] 130+ tests passing
 
 **Not Implemented**:
 
