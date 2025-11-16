@@ -290,6 +290,50 @@ func (c *Client) GetCommentReactions(owner, repo string, commentID int) ([]React
 	return reactions, nil
 }
 
+// AddLabel adds a label to a pull request
+func (c *Client) AddLabel(owner, repo string, prNumber int, label string) error {
+	path := fmt.Sprintf("/repos/%s/%s/issues/%d/labels", owner, repo, prNumber)
+
+	payload := map[string][]string{
+		"labels": {label},
+	}
+
+	_, err := c.makeRequest("POST", path, payload)
+	return err
+}
+
+// RemoveLabel removes a label from a pull request
+func (c *Client) RemoveLabel(owner, repo string, prNumber int, label string) error {
+	path := fmt.Sprintf("/repos/%s/%s/issues/%d/labels/%s", owner, repo, prNumber, label)
+
+	_, err := c.makeRequest("DELETE", path, nil)
+	return err
+}
+
+// GetLabels retrieves all labels from a pull request
+func (c *Client) GetLabels(owner, repo string, prNumber int) ([]string, error) {
+	path := fmt.Sprintf("/repos/%s/%s/issues/%d/labels", owner, repo, prNumber)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var rawLabels []map[string]interface{}
+	if err := json.Unmarshal(data, &rawLabels); err != nil {
+		return nil, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	labels := make([]string, 0, len(rawLabels))
+	for _, l := range rawLabels {
+		if name, ok := l["name"].(string); ok {
+			labels = append(labels, name)
+		}
+	}
+
+	return labels, nil
+}
+
 // GetPRInfo retrieves information about a pull request
 //
 // Returns a PRInfo struct with details about the PR including number, state,

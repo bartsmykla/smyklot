@@ -643,6 +643,45 @@ func handleReactions(
 		return nil
 	}
 
+	// Fetch current PR labels
+	labels, err := client.GetLabels(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		prNum,
+	)
+	if err != nil {
+		// Don't fail if we can't fetch labels, just skip
+		return nil
+	}
+
+	// Build maps for quick lookup
+	reactionMap := make(map[github.ReactionType]bool)
+	labelMap := make(map[string]bool)
+
+	for _, reaction := range reactions {
+		// Check if user has permission
+		canApprove, err := checker.CanApprove(reaction.User, rootPath)
+		if err != nil || !canApprove {
+			continue
+		}
+
+		reactionMap[reaction.Type] = true
+	}
+
+	for _, label := range labels {
+		labelMap[label] = true
+	}
+
+	// Handle removed reactions (reconciliation)
+	if err := handleRemovedReactions(
+		client,
+		prNum,
+		reactionMap,
+		labelMap,
+	); err != nil {
+		return err
+	}
+
 	// Process each reaction
 	for _, reaction := range reactions {
 		// Check if user has permission
@@ -669,6 +708,81 @@ func handleReactions(
 	return nil
 }
 
+// handleRemovedReactions handles reactions that were removed.
+func handleRemovedReactions(
+	client *github.Client,
+	prNum int,
+	reactionMap map[github.ReactionType]bool,
+	labelMap map[string]bool,
+) error {
+	// Check if approve reaction was removed
+	if labelMap[github.LabelReactionApprove] && !reactionMap[github.ReactionApprove] {
+		// Approve reaction was removed, unapprove the PR
+		if err := client.DismissReview(
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			prNum,
+		); err != nil {
+			// Don't fail, just log
+			_, _ = fmt.Fprintf(
+				os.Stderr,
+				"Warning: failed to dismiss review after reaction removal: %v\n",
+				err,
+			)
+		}
+
+		// Remove the label
+		_ = client.RemoveLabel(
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			prNum,
+			github.LabelReactionApprove,
+		)
+	}
+
+	// Check if merge reaction was removed
+	if labelMap[github.LabelReactionMerge] && !reactionMap[github.ReactionMerge] {
+		// Get PR info to check if it's already merged
+		info, err := client.GetPRInfo(
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			prNum,
+		)
+		if err != nil {
+			// Don't fail, just log
+			_, _ = fmt.Fprintf(
+				os.Stderr,
+				"Warning: failed to get PR info after reaction removal: %v\n",
+				err,
+			)
+			return nil
+		}
+
+		// If PR is already merged, post warning (unless disabled)
+		if info.State == "closed" {
+			if !botConfig.QuietReactions {
+				fb := feedback.NewReactionMergeRemoved()
+				_ = client.PostComment(
+					runtimeConfig.RepoOwner,
+					runtimeConfig.RepoName,
+					prNum,
+					fb.Message,
+				)
+			}
+		}
+
+		// Remove the label
+		_ = client.RemoveLabel(
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			prNum,
+			github.LabelReactionMerge,
+		)
+	}
+
+	return nil
+}
+
 // handleReactionApprove handles approval via 👍 reaction.
 func handleReactionApprove(
 	client *github.Client,
@@ -686,6 +800,14 @@ func handleReactionApprove(
 			ErrApprovePR,
 		)
 	}
+
+	// Add label to track reaction-based approval
+	_ = client.AddLabel(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		prNum,
+		github.LabelReactionApprove,
+	)
 
 	// Post success feedback
 	fb := feedback.NewReactionApprovalSuccess(approver, botConfig.QuietReactions)
@@ -728,6 +850,14 @@ func handleReactionMerge(
 			ErrMergePR,
 		)
 	}
+
+	// Add label to track reaction-based merge
+	_ = client.AddLabel(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		prNum,
+		github.LabelReactionMerge,
+	)
 
 	// Post success feedback
 	fb := feedback.NewReactionMergeSuccess(author, botConfig.QuietReactions)

@@ -354,6 +354,20 @@ func NewCommentDeleted(author string, commentID int) *Feedback {
 	}
 }
 
+// NewReactionMergeRemoved creates warning feedback for when merge reaction was removed after PR was merged
+func NewReactionMergeRemoved() *Feedback {
+	message := "⚠️ **Merge Reaction Removed**\n\n" +
+		"The 🚀 reaction that triggered the merge was removed.\n\n" +
+		"**Note:** The PR has already been merged and cannot be unmerged.\n\n" +
+		"This is just a notification for tracking purposes."
+
+	return &Feedback{
+		Type:    Warning,
+		Emoji:   "⚠️",
+		Message: message,
+	}
+}
+
 // NewHelp creates help feedback with usage instructions
 func NewHelp() *Feedback {
 	message := "ℹ️ **Smyklot Bot - Help**\n\n" +

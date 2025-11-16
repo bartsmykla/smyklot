@@ -55,3 +55,11 @@ type Reaction struct {
 	// User is the username of the user who reacted
 	User string
 }
+
+const (
+	// LabelReactionApprove indicates PR was approved via 👍 reaction
+	LabelReactionApprove = "smyklot:reaction-approve"
+
+	// LabelReactionMerge indicates PR was merged via 🚀 reaction
+	LabelReactionMerge = "smyklot:reaction-merge"
+)
