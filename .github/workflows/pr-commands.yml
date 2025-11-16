@@ -23,7 +23,7 @@ jobs:
             .github/CODEOWNERS
 
       - name: Execute command
-        uses: docker://ghcr.io/bartsmykla/smyklot:1.6.0
+        uses: docker://ghcr.io/bartsmykla/smyklot:1.7.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMENT_BODY: ${{ github.event.comment.body }}
