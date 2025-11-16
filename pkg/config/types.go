@@ -36,20 +36,24 @@ type Config struct {
 
 	// DisableReactions disables reaction-based approvals/merges
 	DisableReactions bool `json:"disable_reactions"`
+
+	// DisableDeletedComments disables comments about deleted commands
+	DisableDeletedComments bool `json:"disable_deleted_comments"`
 }
 
 // Default returns a Config with default values
 func Default() *Config {
 	return &Config{
-		QuietSuccess:        false,
-		QuietReactions:      false,
-		AllowedCommands:     []string{},
-		CommandAliases:      make(map[string]string),
-		CommandPrefix:       DefaultCommandPrefix,
-		DisableMentions:     false,
-		DisableBareCommands: false,
-		DisableUnapprove:    false,
-		DisableReactions:    false,
+		QuietSuccess:           false,
+		QuietReactions:         false,
+		AllowedCommands:        []string{},
+		CommandAliases:         make(map[string]string),
+		CommandPrefix:          DefaultCommandPrefix,
+		DisableMentions:        false,
+		DisableBareCommands:    false,
+		DisableUnapprove:       false,
+		DisableReactions:       false,
+		DisableDeletedComments: false,
 	}
 }
 

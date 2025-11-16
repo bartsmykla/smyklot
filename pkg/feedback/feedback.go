@@ -335,6 +335,25 @@ func NewReactionMergeSuccess(author string, quietReactions bool) *Feedback {
 	}
 }
 
+// NewCommentDeleted creates feedback for when a command comment was deleted
+//
+// The message informs that the user deleted the comment that triggered actions
+func NewCommentDeleted(author string, commentID int) *Feedback {
+	message := fmt.Sprintf(
+		"⚠️ **Command Comment Deleted**\n\n"+
+			"User `%s` deleted comment #%d that triggered bot actions.\n\n"+
+			"If this was unintentional, you can re-post the command.",
+		author,
+		commentID,
+	)
+
+	return &Feedback{
+		Type:    Warning,
+		Emoji:   "⚠️",
+		Message: message,
+	}
+}
+
 // NewHelp creates help feedback with usage instructions
 func NewHelp() *Feedback {
 	message := "ℹ️ **Smyklot Bot - Help**\n\n" +

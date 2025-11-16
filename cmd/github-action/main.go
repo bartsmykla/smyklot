@@ -28,6 +28,7 @@ const (
 	envGitHubToken         = "GITHUB_TOKEN" //nolint:gosec // Environment variable name, not a credential
 	envCommentBody         = "COMMENT_BODY"
 	envCommentID           = "COMMENT_ID"
+	envCommentAction       = "COMMENT_ACTION"
 	envPRNumber            = "PR_NUMBER"
 	envRepoOwner           = "REPO_OWNER"
 	envRepoName            = "REPO_NAME"
@@ -84,6 +85,7 @@ const (
 | Disable Bare Commands | ` + "`{{.DisableBareCommands}}`" + ` |
 | Disable Unapprove | ` + "`{{.DisableUnapprove}}`" + ` |
 | Disable Reactions | ` + "`{{.DisableReactions}}`" + ` |
+| Disable Deleted Comments | ` + "`{{.DisableDeletedComments}}`" + ` |
 {{if .AllowedCommands}}| Allowed Commands | ` + "`{{.AllowedCommands}}`" + ` |
 {{else}}| Allowed Commands | All commands allowed |
 {{end}}
@@ -101,6 +103,7 @@ type RuntimeConfig struct {
 	Token               string
 	CommentBody         string
 	CommentID           string
+	CommentAction       string
 	PRNumber            string
 	RepoOwner           string
 	RepoName            string
@@ -125,12 +128,13 @@ type stepSummaryData struct {
 	QuietSuccess        bool
 	QuietReactions      bool
 	CommandPrefix       string
-	DisableMentions     bool
-	DisableBareCommands bool
-	DisableUnapprove    bool
-	DisableReactions    bool
-	AllowedCommands     string
-	CommandAliases      map[string]string
+	DisableMentions        bool
+	DisableBareCommands    bool
+	DisableUnapprove       bool
+	DisableReactions       bool
+	DisableDeletedComments bool
+	AllowedCommands        string
+	CommandAliases         map[string]string
 }
 
 var (
@@ -179,6 +183,7 @@ func init() {
 	rootCmd.Flags().Bool(config.KeyDisableUnapprove, false, "Disable unapprove commands")
 	rootCmd.Flags().Bool(config.KeyQuietReactions, false, "Disable reaction-based approval/merge comments")
 	rootCmd.Flags().Bool(config.KeyDisableReactions, false, "Disable reaction-based approvals/merges")
+	rootCmd.Flags().Bool(config.KeyDisableDeletedComments, false, "Disable comments about deleted commands")
 
 	// Bind flags to Viper
 	bindViperFlags([]string{
@@ -191,6 +196,7 @@ func init() {
 		config.KeyDisableUnapprove,
 		config.KeyQuietReactions,
 		config.KeyDisableReactions,
+		config.KeyDisableDeletedComments,
 	})
 }
 
@@ -224,6 +230,11 @@ func run(_ *cobra.Command, _ []string) error {
 		_, _ = fmt.Fprintf(os.Stderr, "Warning: failed to write step summary: %v\n", err)
 	}
 
+	// Handle deleted comments
+	if runtimeConfig.CommentAction == "deleted" && !botConfig.DisableDeletedComments {
+		return handleDeletedComment()
+	}
+
 	// Parse the command from the comment
 	parsedCmd, err := commands.ParseCommand(runtimeConfig.CommentBody, botConfig)
 	if err != nil {
@@ -248,6 +259,25 @@ func run(_ *cobra.Command, _ []string) error {
 		return NewGitHubError(ErrGitHubClient, err)
 	}
 
+	// Convert string IDs to integers
+	prNum, err := strconv.Atoi(runtimeConfig.PRNumber)
+	if err != nil {
+		return NewInputError(ErrInvalidInput, runtimeConfig.PRNumber, errInvalidPRNum)
+	}
+
+	commentIDNum, err := strconv.Atoi(runtimeConfig.CommentID)
+	if err != nil {
+		return NewInputError(ErrInvalidInput, runtimeConfig.CommentID, errInvalidComment)
+	}
+
+	// Clean up any previous error reactions (in case comment was edited)
+	_ = client.RemoveReaction(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		commentIDNum,
+		github.ReactionError,
+	)
+
 	// Get the current working directory (repository root)
 	repoPath, err := os.Getwd()
 	if err != nil {
@@ -258,17 +288,6 @@ func run(_ *cobra.Command, _ []string) error {
 	checker, err := permissions.NewChecker(repoPath)
 	if err != nil {
 		return NewGitHubError(ErrInitPermissions, err)
-	}
-
-	// Convert string IDs to integers
-	prNum, err := strconv.Atoi(runtimeConfig.PRNumber)
-	if err != nil {
-		return NewInputError(ErrInvalidInput, runtimeConfig.PRNumber, errInvalidPRNum)
-	}
-
-	commentIDNum, err := strconv.Atoi(runtimeConfig.CommentID)
-	if err != nil {
-		return NewInputError(ErrInvalidInput, runtimeConfig.CommentID, errInvalidComment)
 	}
 
 	// Handle help command immediately (no permission check needed)
@@ -325,6 +344,7 @@ func loadConfig() error {
 	loadEnvIfEmpty(&runtimeConfig.Token, envGitHubToken)
 	loadEnvIfEmpty(&runtimeConfig.CommentBody, envCommentBody)
 	loadEnvIfEmpty(&runtimeConfig.CommentID, envCommentID)
+	loadEnvIfEmpty(&runtimeConfig.CommentAction, envCommentAction)
 	loadEnvIfEmpty(&runtimeConfig.PRNumber, envPRNumber)
 	loadEnvIfEmpty(&runtimeConfig.RepoOwner, envRepoOwner)
 	loadEnvIfEmpty(&runtimeConfig.RepoName, envRepoName)
@@ -552,6 +572,47 @@ func handleUnapprove(client *github.Client, prNum, commentID int) error {
 	return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
 }
 
+// handleDeletedComment posts a notification that a command comment was deleted.
+func handleDeletedComment() error {
+	// Get GitHub App installation token if configured
+	token := runtimeConfig.Token
+	installationToken, err := getInstallationToken()
+	if err != nil {
+		return err
+	}
+
+	if installationToken != "" {
+		token = installationToken
+	}
+
+	// Create a GitHub client
+	client, err := github.NewClient(token, emptyBaseURL)
+	if err != nil {
+		return NewGitHubError(ErrGitHubClient, err)
+	}
+
+	// Convert PR number and comment ID
+	prNum, err := strconv.Atoi(runtimeConfig.PRNumber)
+	if err != nil {
+		return NewInputError(ErrInvalidInput, runtimeConfig.PRNumber, errInvalidPRNum)
+	}
+
+	commentIDNum, err := strconv.Atoi(runtimeConfig.CommentID)
+	if err != nil {
+		return NewInputError(ErrInvalidInput, runtimeConfig.CommentID, errInvalidComment)
+	}
+
+	// Post feedback about deleted comment
+	fb := feedback.NewCommentDeleted(runtimeConfig.CommentAuthor, commentIDNum)
+
+	return client.PostComment(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		prNum,
+		fb.Message,
+	)
+}
+
 // handleHelp handles the /help command.
 func handleHelp(client *github.Client, prNum, commentID int) error {
 	// Add eyes reaction to acknowledge
@@ -771,12 +832,13 @@ func writeStepSummary() error {
 		QuietSuccess:        botConfig.QuietSuccess,
 		QuietReactions:      botConfig.QuietReactions,
 		CommandPrefix:       botConfig.CommandPrefix,
-		DisableMentions:     botConfig.DisableMentions,
-		DisableBareCommands: botConfig.DisableBareCommands,
-		DisableUnapprove:    botConfig.DisableUnapprove,
-		DisableReactions:    botConfig.DisableReactions,
-		AllowedCommands:     allowedCommands,
-		CommandAliases:      botConfig.CommandAliases,
+		DisableMentions:        botConfig.DisableMentions,
+		DisableBareCommands:    botConfig.DisableBareCommands,
+		DisableUnapprove:       botConfig.DisableUnapprove,
+		DisableReactions:       botConfig.DisableReactions,
+		DisableDeletedComments: botConfig.DisableDeletedComments,
+		AllowedCommands:        allowedCommands,
+		CommandAliases:         botConfig.CommandAliases,
 	}
 
 	if err := tmpl.Execute(file, data); err != nil {

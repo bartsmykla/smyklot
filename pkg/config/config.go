@@ -36,6 +36,9 @@ const (
 	// KeyDisableReactions is the config key for disable_reactions setting
 	KeyDisableReactions = "disable_reactions"
 
+	// KeyDisableDeletedComments is the config key for disable_deleted_comments setting
+	KeyDisableDeletedComments = "disable_deleted_comments"
+
 	// EnvPrefix is the prefix for environment variables
 	EnvPrefix = "SMYKLOT"
 )
@@ -52,6 +55,7 @@ func SetupViper(v *viper.Viper) {
 	v.SetDefault(KeyDisableBareCommands, false)
 	v.SetDefault(KeyDisableUnapprove, false)
 	v.SetDefault(KeyDisableReactions, false)
+	v.SetDefault(KeyDisableDeletedComments, false)
 
 	// Enable environment variable support
 	v.SetEnvPrefix(EnvPrefix)
@@ -61,14 +65,15 @@ func SetupViper(v *viper.Viper) {
 // LoadFromViper creates a Config from Viper settings
 func LoadFromViper(v *viper.Viper) *Config {
 	return &Config{
-		QuietSuccess:        v.GetBool(KeyQuietSuccess),
-		QuietReactions:      v.GetBool(KeyQuietReactions),
-		AllowedCommands:     v.GetStringSlice(KeyAllowedCommands),
-		CommandAliases:      v.GetStringMapString(KeyCommandAliases),
-		CommandPrefix:       v.GetString(KeyCommandPrefix),
-		DisableMentions:     v.GetBool(KeyDisableMentions),
-		DisableBareCommands: v.GetBool(KeyDisableBareCommands),
-		DisableUnapprove:    v.GetBool(KeyDisableUnapprove),
-		DisableReactions:    v.GetBool(KeyDisableReactions),
+		QuietSuccess:           v.GetBool(KeyQuietSuccess),
+		QuietReactions:         v.GetBool(KeyQuietReactions),
+		AllowedCommands:        v.GetStringSlice(KeyAllowedCommands),
+		CommandAliases:         v.GetStringMapString(KeyCommandAliases),
+		CommandPrefix:          v.GetString(KeyCommandPrefix),
+		DisableMentions:        v.GetBool(KeyDisableMentions),
+		DisableBareCommands:    v.GetBool(KeyDisableBareCommands),
+		DisableUnapprove:       v.GetBool(KeyDisableUnapprove),
+		DisableReactions:       v.GetBool(KeyDisableReactions),
+		DisableDeletedComments: v.GetBool(KeyDisableDeletedComments),
 	}
 }
