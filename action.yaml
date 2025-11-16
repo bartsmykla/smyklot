@@ -1,1 +1,11 @@
-@action.yaml
+name: 'Smyklot'
+description: 'Automated PR approvals and merges based on CODEOWNERS permissions'
+author: 'Bart Smykla'
+
+branding:
+  icon: 'zap'
+  color: 'purple'
+
+runs:
+  using: 'docker'
+  image: 'docker://ghcr.io/bartsmykla/smyklot:1.7.2'
