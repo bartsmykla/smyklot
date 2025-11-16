@@ -254,6 +254,44 @@ func NewNotMergeable() *Feedback {
 	}
 }
 
+// NewAutoMergeEnabled creates success feedback for enabled auto-merge
+//
+// The author parameter is the user who requested auto-merge
+// If quietSuccess is true, only an emoji reaction is used (no comment)
+func NewAutoMergeEnabled(author string, quietSuccess bool) *Feedback {
+	message := ""
+	if !quietSuccess {
+		message = fmt.Sprintf(
+			"✅ **Auto-Merge Enabled**\n\n"+
+				"Auto-merge has been enabled by `%s`.\n\n"+
+				"The PR will automatically merge when all required checks pass.",
+			author,
+		)
+	}
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "✅",
+		Message: message,
+	}
+}
+
+// NewAutoMergeFailed creates error feedback for failed auto-merge enablement
+func NewAutoMergeFailed(reason string) *Feedback {
+	message := fmt.Sprintf(
+		"❌ **Auto-Merge Failed**\n\n"+
+			"Failed to enable auto-merge for this pull request.\n\n"+
+			"**Reason:** %s",
+		reason,
+	)
+
+	return &Feedback{
+		Type:    Error,
+		Emoji:   "❌",
+		Message: message,
+	}
+}
+
 // NewUnapproveSuccess creates success feedback for dismissing a review
 //
 // The message acknowledges who dismissed the review

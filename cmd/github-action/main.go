@@ -562,7 +562,7 @@ func executeApprove(client *github.Client, prNum int) (*feedback.Feedback, error
 //
 //nolint:unparam // error return kept for consistent function signature
 func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (*feedback.Feedback, error) {
-	// Get PR info to check if it's mergeable
+	// Get PR info to check if it's mergeable and get base branch
 	info, err := client.GetPRInfo(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum)
 	if err != nil {
 		return feedback.NewMergeFailed(err.Error()), nil
@@ -589,6 +589,18 @@ func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (
 		}
 	}
 
+	// Check if merge queue is enabled - if so, always use auto-merge
+	if info.BaseBranch != "" {
+		mergeQueueEnabled, _ := client.IsMergeQueueEnabled(
+			runtimeConfig.RepoOwner,
+			runtimeConfig.RepoName,
+			info.BaseBranch,
+		)
+		if mergeQueueEnabled {
+			return enableAutoMerge(client, prNum, method)
+		}
+	}
+
 	// Merge the PR
 	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, method); err != nil {
 		// If merge commits not allowed and using default merge method, try squash first
@@ -596,15 +608,54 @@ func executeMerge(client *github.Client, prNum int, method github.MergeMethod) (
 			if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodSquash); err != nil {
 				// Try rebase if squash also fails
 				if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodRebase); err != nil {
+					// Check if we should enable auto-merge instead
+					if shouldEnableAutoMerge(err) {
+						return enableAutoMerge(client, prNum, github.MergeMethodRebase)
+					}
 					return feedback.NewMergeFailed(err.Error()), nil
 				}
 			}
-		} else {
-			return feedback.NewMergeFailed(err.Error()), nil
+			// Squash succeeded
+			return feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
 		}
+
+		// Check if we should enable auto-merge instead of failing
+		if shouldEnableAutoMerge(err) {
+			return enableAutoMerge(client, prNum, method)
+		}
+
+		return feedback.NewMergeFailed(err.Error()), nil
 	}
 
 	return feedback.NewMergeSuccess(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
+}
+
+// shouldEnableAutoMerge checks if error indicates auto-merge should be enabled
+func shouldEnableAutoMerge(err error) bool {
+	errStr := err.Error()
+	return strings.Contains(errStr, "merge queue") ||
+		strings.Contains(errStr, "required status check") ||
+		strings.Contains(errStr, "status checks") ||
+		strings.Contains(errStr, "required review") ||
+		strings.Contains(errStr, "branch protection")
+}
+
+// enableAutoMerge enables auto-merge for the PR
+func enableAutoMerge(
+	client *github.Client,
+	prNum int,
+	method github.MergeMethod,
+) (*feedback.Feedback, error) {
+	if err := client.EnableAutoMerge(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		prNum,
+		method,
+	); err != nil {
+		return feedback.NewAutoMergeFailed(err.Error()), nil
+	}
+
+	return feedback.NewAutoMergeEnabled(runtimeConfig.CommentAuthor, botConfig.QuietSuccess), nil
 }
 
 // executeUnapprove executes the unapprove command and returns feedback
@@ -727,6 +778,14 @@ func postCombinedFeedback(client *github.Client, prNum, commentID int, fb *feedb
 			return NewGitHubError(ErrPostComment, err)
 		}
 	}
+
+	// Remove eyes reaction before adding final status reaction
+	_ = client.RemoveReaction(
+		runtimeConfig.RepoOwner,
+		runtimeConfig.RepoName,
+		commentID,
+		github.ReactionEyes,
+	)
 
 	// Add reaction
 	if err := client.AddReaction(
@@ -1052,6 +1111,37 @@ func handleReactionMerge(
 
 	// Merge the PR (using default merge method)
 	if err := client.MergePR(runtimeConfig.RepoOwner, runtimeConfig.RepoName, prNum, github.MergeMethodMerge); err != nil {
+		// Check if we should enable auto-merge instead
+		if shouldEnableAutoMerge(err) {
+			if err := client.EnableAutoMerge(
+				runtimeConfig.RepoOwner,
+				runtimeConfig.RepoName,
+				prNum,
+				github.MergeMethodMerge,
+			); err != nil {
+				return postOperationFailure(
+					client,
+					prNum,
+					commentID,
+					err,
+					feedback.NewAutoMergeFailed,
+					ErrMergePR,
+				)
+			}
+
+			// Add label to track reaction-based auto-merge
+			_ = client.AddLabel(
+				runtimeConfig.RepoOwner,
+				runtimeConfig.RepoName,
+				prNum,
+				github.LabelReactionMerge,
+			)
+
+			// Post auto-merge enabled feedback
+			fb := feedback.NewAutoMergeEnabled(author, botConfig.QuietReactions)
+			return postFeedback(client, prNum, commentID, fb.Message, github.ReactionSuccess)
+		}
+
 		return postOperationFailure(
 			client,
 			prNum,

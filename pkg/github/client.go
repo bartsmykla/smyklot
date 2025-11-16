@@ -258,6 +258,61 @@ func (c *Client) MergePR(owner, repo string, prNumber int, method MergeMethod) e
 	return err
 }
 
+// EnableAutoMerge enables auto-merge for a pull request
+//
+// This will automatically merge the PR when all required checks pass.
+// Uses GraphQL API as auto-merge is not available in REST API.
+func (c *Client) EnableAutoMerge(owner, repo string, prNumber int, method MergeMethod) error {
+	// Get PR node ID first (required for GraphQL)
+	path := fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, repo, prNumber)
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		return err
+	}
+
+	var prData map[string]interface{}
+	if err := json.Unmarshal(data, &prData); err != nil {
+		return NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	nodeID, ok := prData["node_id"].(string)
+	if !ok {
+		return NewAPIError(
+			ErrResponseParse,
+			0,
+			"GET",
+			path,
+			fmt.Errorf("no node_id in response"),
+		)
+	}
+
+	// Map merge method to GraphQL enum
+	var gqlMethod string
+	switch method {
+	case MergeMethodMerge:
+		gqlMethod = "MERGE"
+	case MergeMethodSquash:
+		gqlMethod = "SQUASH"
+	case MergeMethodRebase:
+		gqlMethod = "REBASE"
+	default:
+		gqlMethod = "MERGE"
+	}
+
+	// Enable auto-merge via GraphQL
+	graphqlPath := "/graphql"
+	query := map[string]interface{}{
+		"query": fmt.Sprintf(
+			`mutation { enablePullRequestAutoMerge(input: {pullRequestId: "%s", mergeMethod: %s}) { clientMutationId } }`,
+			nodeID,
+			gqlMethod,
+		),
+	}
+
+	_, err = c.makeRequest("POST", graphqlPath, query)
+	return err
+}
+
 // GetCommentReactions retrieves all reactions for a comment
 //
 // Returns a slice of Reaction structs containing user and reaction type information.
@@ -419,6 +474,12 @@ func (c *Client) GetPRInfo(owner, repo string, prNumber int) (*PRInfo, error) {
 		}
 	}
 
+	if base, ok := response["base"].(map[string]interface{}); ok {
+		if ref, ok := base["ref"].(string); ok {
+			info.BaseBranch = ref
+		}
+	}
+
 	return info, nil
 }
 
@@ -474,6 +535,41 @@ func (c *Client) GetOpenPRs(owner, repo string) ([]map[string]interface{}, error
 	}
 
 	return openPRs, nil
+}
+
+// IsMergeQueueEnabled checks if merge queue is enabled for a branch
+func (c *Client) IsMergeQueueEnabled(owner, repo, branch string) (bool, error) {
+	path := fmt.Sprintf("/repos/%s/%s/branches/%s/protection", owner, repo, branch)
+
+	data, err := c.makeRequest("GET", path, nil)
+	if err != nil {
+		// 404 means branch protection not enabled
+		if strings.Contains(err.Error(), "404") {
+			return false, nil
+		}
+		return false, err
+	}
+
+	var protection map[string]interface{}
+	if err := json.Unmarshal(data, &protection); err != nil {
+		return false, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	// Check if merge queue is enabled
+	if mergeQueue, ok := protection["required_pull_request_reviews"].(map[string]interface{}); ok {
+		if enabled, ok := mergeQueue["require_last_push_approval"].(bool); ok && enabled {
+			return true, nil
+		}
+	}
+
+	// Also check for the merge_queue field directly
+	if mergeQueue, ok := protection["merge_queue"].(map[string]interface{}); ok {
+		if enabled, ok := mergeQueue["enabled"].(bool); ok {
+			return enabled, nil
+		}
+	}
+
+	return false, nil
 }
 
 // makeRequest makes an HTTP request to the GitHub API

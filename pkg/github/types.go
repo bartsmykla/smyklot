@@ -22,6 +22,9 @@ type PRInfo struct {
 
 	// Body is the PR description
 	Body string
+
+	// BaseBranch is the base branch (e.g. "main", "master")
+	BaseBranch string
 }
 
 // ReactionType represents the type of emoji reaction
