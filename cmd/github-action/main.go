@@ -148,7 +148,9 @@ type stepSummaryData struct {
 }
 
 var (
-	githubNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
+	// githubNamePattern validates GitHub repository and owner names
+	// Allows: alphanumeric, hyphens, underscores, dots (e.g., .dotfiles, foo_bar, foo-bar)
+	githubNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 )
 
 var rootCmd = &cobra.Command{
