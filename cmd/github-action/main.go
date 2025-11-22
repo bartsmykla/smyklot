@@ -647,6 +647,30 @@ func handleUnauthorized(
 	return postFeedback(ctx, client, rc, prNum, commentID, fb.Message, github.ReactionError)
 }
 
+// isBotAlreadyApproved checks if the bot has already approved the PR.
+// Returns true if bot already approved, false otherwise.
+// Also returns the bot username and any error encountered.
+func isBotAlreadyApproved(
+	ctx context.Context,
+	client *github.Client,
+	info *github.PRInfo,
+) (bool, string, error) {
+	// Get bot's username
+	botUsername, err := client.GetAuthenticatedUser(ctx)
+	if err != nil {
+		return false, "", err
+	}
+
+	// Check if bot already approved
+	for _, approver := range info.ApprovedBy {
+		if approver == botUsername {
+			return true, botUsername, nil
+		}
+	}
+
+	return false, botUsername, nil
+}
+
 // handleApprove handles the /approve command.
 // executeApprove executes the approve command and returns feedback
 //
@@ -666,7 +690,18 @@ func executeApprove(ctx context.Context, client *github.Client, rc *RuntimeConfi
 		), nil
 	}
 
-	// Check if already approved by the comment author
+	// Check if bot already approved the PR (prevents duplicate approvals from edits/reactions)
+	alreadyApproved, botUsername, err := isBotAlreadyApproved(ctx, client, info)
+	if err != nil {
+		return feedback.NewApprovalFailed(err.Error()), nil
+	}
+
+	if alreadyApproved {
+		// Bot already approved - return feedback (filtered for new comments)
+		return feedback.NewAlreadyApproved(botUsername), nil
+	}
+
+	// Check if already approved by the comment author (informational feedback)
 	for _, approver := range info.ApprovedBy {
 		if approver == rc.CommentAuthor {
 			// Already approved - return feedback indicating no action needed
@@ -698,17 +733,23 @@ func executeMerge(ctx context.Context, client *github.Client, rc *RuntimeConfig,
 		return feedback.NewNotMergeable(), nil
 	}
 
-	// Check if user already approved the PR, if not approve it first
-	alreadyApproved := false
+	// Check if bot already approved the PR (prevents duplicate approvals from edits/reactions)
+	botAlreadyApproved, _, err := isBotAlreadyApproved(ctx, client, info)
+	if err != nil {
+		return feedback.NewApprovalFailed(err.Error()), nil
+	}
+
+	// Check if user already approved the PR (avoid redundant bot approval)
+	userAlreadyApproved := false
 	for _, approver := range info.ApprovedBy {
 		if approver == rc.CommentAuthor {
-			alreadyApproved = true
+			userAlreadyApproved = true
 			break
 		}
 	}
 
-	// Approve the PR if not already approved
-	if !alreadyApproved {
+	// Approve the PR if neither bot nor user has already approved
+	if !botAlreadyApproved && !userAlreadyApproved {
 		if err := client.ApprovePR(ctx, rc.RepoOwner, rc.RepoName, prNum); err != nil {
 			return feedback.NewApprovalFailed(err.Error()), nil
 		}
@@ -1244,8 +1285,8 @@ func handleReactionApprove(
 		return postFeedback(ctx, client, rc, prNum, commentID, fb.Message, github.ReactionError)
 	}
 
-	// Get authenticated user (bot) to check if already approved
-	botUsername, err := client.GetAuthenticatedUser(ctx)
+	// Check if bot already approved the PR (prevents duplicate approvals)
+	alreadyApproved, _, err := isBotAlreadyApproved(ctx, client, info)
 	if err != nil {
 		return postOperationFailure(
 			ctx,
@@ -1259,19 +1300,16 @@ func handleReactionApprove(
 		)
 	}
 
-	// Check if bot already approved the PR
-	for _, existingApprover := range info.ApprovedBy {
-		if existingApprover == botUsername {
-			// Already approved - skip approval but still add label
-			_ = client.AddLabel(
-				ctx,
-				rc.RepoOwner,
-				rc.RepoName,
-				prNum,
-				github.LabelReactionApprove,
-			)
-			return nil
-		}
+	if alreadyApproved {
+		// Bot already approved - skip approval but still add label
+		_ = client.AddLabel(
+			ctx,
+			rc.RepoOwner,
+			rc.RepoName,
+			prNum,
+			github.LabelReactionApprove,
+		)
+		return nil
 	}
 
 	// Approve the PR
@@ -1338,17 +1376,32 @@ func handleReactionMerge(
 		return postNotMergeable(ctx, client, rc, prNum, commentID)
 	}
 
-	// Check if user already approved the PR, if not approve it first
-	alreadyApproved := false
+	// Check if bot already approved the PR (prevents duplicate approvals from edits/reactions)
+	botAlreadyApproved, _, err := isBotAlreadyApproved(ctx, client, info)
+	if err != nil {
+		return postOperationFailure(
+			ctx,
+			client,
+			rc,
+			prNum,
+			commentID,
+			err,
+			feedback.NewApprovalFailed,
+			ErrApprovePR,
+		)
+	}
+
+	// Check if user already approved the PR (avoid redundant bot approval)
+	userAlreadyApproved := false
 	for _, approver := range info.ApprovedBy {
 		if approver == author {
-			alreadyApproved = true
+			userAlreadyApproved = true
 			break
 		}
 	}
 
-	// Approve the PR if not already approved
-	if !alreadyApproved {
+	// Approve the PR if neither bot nor user has already approved
+	if !botAlreadyApproved && !userAlreadyApproved {
 		if err := client.ApprovePR(ctx, rc.RepoOwner, rc.RepoName, prNum); err != nil {
 			return postOperationFailure(
 				ctx,
