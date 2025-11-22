@@ -370,6 +370,21 @@ task = "3.42.0"                            # Task runner
 - **Commit flags**: Always use `-sS` (sign-off + GPG sign)
 - **PR workflow**: Follow global `CLAUDE.md` guidelines
 
+## Releases
+
+**Process**: Fully automated via GitHub Actions (see `RELEASING.md` for details)
+
+- **Auto-release**: Runs daily at 10:00 UTC, analyzes commits, bumps version
+- **Versioning**: Semantic versioning based on conventional commits
+  - `feat:` → minor bump (0.X.0)
+  - `fix:` → patch bump (0.0.X)
+  - `feat!:` or `BREAKING CHANGE` → major bump (X.0.0)
+- **Artifacts**: Docker image (`ghcr.io/bartsmykla/smyklot:X.Y.Z`), binaries
+- **Manual trigger**: `gh workflow run auto-release.yaml`
+- **Version files**: `action.yml` (Docker image tag), Git tags (source of truth)
+
+**Important**: Use conventional commit format to ensure proper version bumping.
+
 ## Testing on .dotfiles Repository
 
 The workflows can be tested on `bartsmykla/.dotfiles`:
