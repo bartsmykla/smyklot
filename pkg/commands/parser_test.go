@@ -716,5 +716,71 @@ m`
 				Expect(cmd.IsValid).To(BeTrue())
 			})
 		})
+
+		Context("when parsing technical content that should not be treated as commands", func() {
+			It("should not parse 'Fixed' in PR review summary", func() {
+				comment := `Addressed Copilot review feedback. Summary of changes:
+
+**Fixed (Real Issues):**
+1. ✅ exec_loader.go:89 - Fixed verifyExecutable() to properly check errors
+2. ✅ grpc_loader.go:142,166 - Context propagation fixed: use parent context
+
+All changes tested:
+- task build ✅
+- task lint ✅
+- task test ✅`
+
+				cmd, err := commands.ParseCommand(comment, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.IsValid).To(BeFalse())
+				Expect(cmd.Commands).To(BeEmpty())
+			})
+
+			It("should not parse technical summary with 'Fixed' keyword", func() {
+				comment := "Fixed verifyExecutable() to properly check errors instead of ignoring them"
+
+				cmd, err := commands.ParseCommand(comment, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should not parse PR review feedback list", func() {
+				comment := `Addressed review feedback:
+- Fixed context propagation in loader
+- Added error handling for edge cases
+- Updated documentation`
+
+				cmd, err := commands.ParseCommand(comment, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should not parse commit message style text", func() {
+				comment := "feat(loader): add support for plugin validation"
+
+				cmd, err := commands.ParseCommand(comment, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should not parse code review summary", func() {
+				comment := "Reviewed the changes. All tests pass. Ready to merge once CI completes."
+
+				cmd, err := commands.ParseCommand(comment, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should not parse GitHub Actions workflow summary", func() {
+				comment := `Workflow completed successfully:
+- Build: ✅
+- Test: ✅
+- Lint: ✅`
+
+				cmd, err := commands.ParseCommand(comment, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+		})
 	})
 })

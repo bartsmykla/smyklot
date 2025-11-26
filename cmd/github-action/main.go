@@ -248,6 +248,11 @@ func run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	// If no valid command was detected and reactions are disabled, exit early
+	if !parsedCmd.IsValid && bc.DisableReactions {
+		return nil
+	}
+
 	// Get GitHub App installation token if configured
 	token := rc.Token
 	installationToken, err := getInstallationToken(rc)
@@ -309,10 +314,18 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Handle reaction-based approvals/merges if enabled
-	if !bc.DisableReactions {
+	// Only process reactions if no command was found in the comment
+	if !bc.DisableReactions && !parsedCmd.IsValid {
 		if err := handleReactions(ctx, client, rc, bc, checker, prNum, commentIDNum); err != nil {
 			return err
 		}
+		// Reactions have been processed, exit early
+		return nil
+	}
+
+	// No valid command found and either reactions are disabled or we already processed them
+	if !parsedCmd.IsValid {
+		return nil
 	}
 
 	// Check if the user has permission to execute this command
