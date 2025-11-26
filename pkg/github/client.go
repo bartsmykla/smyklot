@@ -159,10 +159,11 @@ func (c *Client) ApprovePR(ctx context.Context, owner, repo string, prNumber int
 	return err
 }
 
-// DismissReview dismisses all approved reviews by the authenticated user
+// DismissReview dismisses all approved reviews by the authenticated user.
 //
-// WARNING: This method calls GET /user which requires special permissions
-// not granted to GitHub App installation tokens. Use DismissReviewByUsername instead.
+// Deprecated: This method calls GetAuthenticatedUser which fails with GitHub App
+// installation tokens (403 "Resource not accessible by integration").
+// Use DismissReviewByUsername instead.
 func (c *Client) DismissReview(ctx context.Context, owner, repo string, prNumber int) error {
 	username, err := c.GetAuthenticatedUser(ctx)
 	if err != nil {
@@ -190,7 +191,12 @@ func (c *Client) DismissReviewByUsername(
 	return c.dismissApprovedReviews(ctx, owner, repo, prNumber, username, reviews)
 }
 
-// GetAuthenticatedUser retrieves the authenticated user's username
+// GetAuthenticatedUser retrieves the authenticated user's username.
+//
+// Deprecated: This method calls GET /user which fails with GitHub App installation
+// tokens (403 "Resource not accessible by integration"). Use the configured
+// bot username (RuntimeConfig.BotUsername) instead. For GitHub Apps, the username
+// format is "{app-slug}[bot]" (e.g., "smyklot[bot]").
 func (c *Client) GetAuthenticatedUser(ctx context.Context) (string, error) {
 	userPath := "/user"
 	userData, err := c.makeRequest(ctx, "GET", userPath, nil)
