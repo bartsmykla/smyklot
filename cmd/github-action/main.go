@@ -296,7 +296,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Initialize permission checker from content
-	checker, err := permissions.NewCheckerFromContent(codeownersContent)
+	checker, err := permissions.NewCheckerFromContent(codeownersContent, client)
 	if err != nil {
 		return NewGitHubError(ErrInitPermissions, err)
 	}

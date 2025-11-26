@@ -333,6 +333,79 @@ var _ = Describe("GitHub Client [Unit]", func() {
 		})
 	})
 
+	Describe("IsTeamMember", func() {
+		Context("when checking team membership", func() {
+			It("should return true when user is a team member", func() {
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					Expect(r.Method).To(Equal("GET"))
+					Expect(r.URL.Path).To(Equal("/orgs/test-org/teams/test-team/memberships/testuser"))
+					Expect(r.Header.Get("Authorization")).To(Equal("token test-token"))
+
+					w.WriteHeader(http.StatusOK)
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{
+						"state": "active",
+						"role":  "member",
+					})
+				}))
+
+				client, err := github.NewClient("test-token", server.URL)
+				Expect(err).NotTo(HaveOccurred())
+
+				isMember, err := client.IsTeamMember(context.Background(), "test-org", "test-team", "testuser")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(isMember).To(BeTrue())
+			})
+
+			It("should return false when user is not a team member", func() {
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusNotFound)
+					_ = json.NewEncoder(w).Encode(map[string]string{
+						"message": "Not Found",
+					})
+				}))
+
+				client, err := github.NewClient("test-token", server.URL)
+				Expect(err).NotTo(HaveOccurred())
+
+				isMember, err := client.IsTeamMember(context.Background(), "test-org", "test-team", "nonmember")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(isMember).To(BeFalse())
+			})
+
+			It("should return false when team membership is pending", func() {
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{
+						"state": "pending",
+						"role":  "member",
+					})
+				}))
+
+				client, err := github.NewClient("test-token", server.URL)
+				Expect(err).NotTo(HaveOccurred())
+
+				isMember, err := client.IsTeamMember(context.Background(), "test-org", "test-team", "pendinguser")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(isMember).To(BeFalse())
+			})
+
+			It("should handle API errors", func() {
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusForbidden)
+					_ = json.NewEncoder(w).Encode(map[string]string{
+						"message": "Forbidden",
+					})
+				}))
+
+				client, err := github.NewClient("test-token", server.URL)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = client.IsTeamMember(context.Background(), "test-org", "test-team", "testuser")
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
 	Describe("Error Handling", func() {
 		Context("when handling various error conditions", func() {
 			It("should handle network errors", func() {

@@ -1,6 +1,7 @@
 package permissions_test
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,6 +11,18 @@ import (
 
 	"github.com/bartsmykla/smyklot/pkg/permissions"
 )
+
+// mockGitHubClient is a mock implementation of GitHubClient for testing
+type mockGitHubClient struct {
+	isTeamMemberFunc func(ctx context.Context, org, teamSlug, username string) (bool, error)
+}
+
+func (m *mockGitHubClient) IsTeamMember(ctx context.Context, org, teamSlug, username string) (bool, error) {
+	if m.isTeamMemberFunc != nil {
+		return m.isTeamMemberFunc(ctx, org, teamSlug, username)
+	}
+	return false, nil
+}
 
 var _ = Describe("Permission Checker [Unit]", func() {
 	var tempDir string
@@ -28,19 +41,19 @@ var _ = Describe("Permission Checker [Unit]", func() {
 
 	Describe("NewChecker", func() {
 		It("should create a new checker with valid repo path", func() {
-			checker, err := permissions.NewChecker(tempDir)
+			checker, err := permissions.NewChecker(tempDir, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(checker).NotTo(BeNil())
 		})
 
 		It("should return error for empty repo path", func() {
-			_, err := permissions.NewChecker("")
+			_, err := permissions.NewChecker("", nil)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.Is(err, permissions.ErrEmptyRepoPath)).To(BeTrue())
 		})
 
 		It("should return error for non-existent repo path", func() {
-			_, err := permissions.NewChecker("/nonexistent/path")
+			_, err := permissions.NewChecker("/nonexistent/path", nil)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.Is(err, permissions.ErrRepoPathNotExist)).To(BeTrue())
 		})
@@ -61,7 +74,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
-				checker, err = permissions.NewChecker(tempDir)
+				checker, err = permissions.NewChecker(tempDir, nil)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -117,7 +130,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 		Context("when CODEOWNERS file does not exist", func() {
 			BeforeEach(func() {
 				var err error
-				checker, err = permissions.NewChecker(tempDir)
+				checker, err = permissions.NewChecker(tempDir, nil)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -140,7 +153,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
-				checker, err = permissions.NewChecker(tempDir)
+				checker, err = permissions.NewChecker(tempDir, nil)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -163,7 +176,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
-				checker, err = permissions.NewChecker(tempDir)
+				checker, err = permissions.NewChecker(tempDir, nil)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -203,7 +216,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
-				checker, err = permissions.NewChecker(tempDir)
+				checker, err = permissions.NewChecker(tempDir, nil)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -225,6 +238,124 @@ var _ = Describe("Permission Checker [Unit]", func() {
 				Expect(canApprove).To(BeTrue())
 			})
 		})
+
+		Context("when CODEOWNERS contains team ownership", func() {
+			BeforeEach(func() {
+				githubDir := filepath.Join(tempDir, ".github")
+				err := os.MkdirAll(githubDir, 0755)
+				Expect(err).NotTo(HaveOccurred())
+
+				content := `* @test-org/test-team @individual-user`
+				codeownersPath := filepath.Join(githubDir, "CODEOWNERS")
+				err = os.WriteFile(codeownersPath, []byte(content), 0600)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should approve team member when GitHub client is provided", func() {
+				mockClient := &mockGitHubClient{
+					isTeamMemberFunc: func(ctx context.Context, org, teamSlug, username string) (bool, error) {
+						Expect(org).To(Equal("test-org"))
+						Expect(teamSlug).To(Equal("test-team"))
+						Expect(username).To(Equal("team-member"))
+						return true, nil
+					},
+				}
+
+				checker, err := permissions.NewChecker(tempDir, mockClient)
+				Expect(err).NotTo(HaveOccurred())
+
+				canApprove, err := checker.CanApprove("team-member", "/path")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(canApprove).To(BeTrue())
+			})
+
+			It("should deny non-team member when GitHub client is provided", func() {
+				mockClient := &mockGitHubClient{
+					isTeamMemberFunc: func(ctx context.Context, org, teamSlug, username string) (bool, error) {
+						return false, nil
+					},
+				}
+
+				checker, err := permissions.NewChecker(tempDir, mockClient)
+				Expect(err).NotTo(HaveOccurred())
+
+				canApprove, err := checker.CanApprove("non-member", "/path")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(canApprove).To(BeFalse())
+			})
+
+			It("should approve individual user even with teams", func() {
+				mockClient := &mockGitHubClient{
+					isTeamMemberFunc: func(ctx context.Context, org, teamSlug, username string) (bool, error) {
+						return false, nil
+					},
+				}
+
+				checker, err := permissions.NewChecker(tempDir, mockClient)
+				Expect(err).NotTo(HaveOccurred())
+
+				canApprove, err := checker.CanApprove("individual-user", "/path")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(canApprove).To(BeTrue())
+			})
+
+			It("should skip team check when no GitHub client is provided", func() {
+				checker, err := permissions.NewChecker(tempDir, nil)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Without GitHub client, team membership cannot be checked
+				canApprove, err := checker.CanApprove("team-member", "/path")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(canApprove).To(BeFalse())
+
+				// But individual users still work
+				canApprove, err = checker.CanApprove("individual-user", "/path")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(canApprove).To(BeTrue())
+			})
+
+			It("should handle GitHub API errors", func() {
+				mockClient := &mockGitHubClient{
+					isTeamMemberFunc: func(ctx context.Context, org, teamSlug, username string) (bool, error) {
+						return false, errors.New("API error")
+					},
+				}
+
+				checker, err := permissions.NewChecker(tempDir, mockClient)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = checker.CanApprove("team-member", "/path")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("API error"))
+			})
+
+			It("should check multiple teams", func() {
+				githubDir := filepath.Join(tempDir, ".github")
+				content := `* @org1/team1 @org2/team2 @individual-user`
+				codeownersPath := filepath.Join(githubDir, "CODEOWNERS")
+				err := os.WriteFile(codeownersPath, []byte(content), 0600)
+				Expect(err).NotTo(HaveOccurred())
+
+				callCount := 0
+				mockClient := &mockGitHubClient{
+					isTeamMemberFunc: func(ctx context.Context, org, teamSlug, username string) (bool, error) {
+						callCount++
+						if org == "org2" && teamSlug == "team2" && username == "user" {
+							return true, nil
+						}
+						return false, nil
+					},
+				}
+
+				checker, err := permissions.NewChecker(tempDir, mockClient)
+				Expect(err).NotTo(HaveOccurred())
+
+				canApprove, err := checker.CanApprove("user", "/path")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(canApprove).To(BeTrue())
+				Expect(callCount).To(Equal(2)) // Should check both teams
+			})
+		})
 	})
 
 	Describe("GetApprovers", func() {
@@ -241,7 +372,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
-				checker, err = permissions.NewChecker(tempDir)
+				checker, err = permissions.NewChecker(tempDir, nil)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -254,7 +385,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 		Context("when CODEOWNERS file does not exist", func() {
 			BeforeEach(func() {
 				var err error
-				checker, err = permissions.NewChecker(tempDir)
+				checker, err = permissions.NewChecker(tempDir, nil)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -275,7 +406,7 @@ var _ = Describe("Permission Checker [Unit]", func() {
 				err = os.WriteFile(codeownersPath, []byte(content), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
-				checker, err = permissions.NewChecker(tempDir)
+				checker, err = permissions.NewChecker(tempDir, nil)
 				Expect(err).NotTo(HaveOccurred())
 			})
 

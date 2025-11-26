@@ -734,6 +734,43 @@ func (c *Client) HasWritePermission(ctx context.Context, owner, repo, username s
 	return permission == "admin" || permission == "write", nil
 }
 
+// IsTeamMember checks if a user is a member of a team
+//
+// Returns true if the user is an active member of the team (org/team-slug format).
+// Returns false if the user is not a member or membership is pending.
+func (c *Client) IsTeamMember(ctx context.Context, org, teamSlug, username string) (bool, error) {
+	path := fmt.Sprintf("/orgs/%s/teams/%s/memberships/%s", org, teamSlug, username)
+
+	data, err := c.makeRequest(ctx, "GET", path, nil)
+	if err != nil {
+		// 404 means user is not a member
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+			return false, nil
+		}
+		return false, err
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return false, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	// Check if membership is active (not pending)
+	state, ok := response["state"].(string)
+	if !ok {
+		return false, NewAPIError(
+			ErrResponseParse,
+			0,
+			"GET",
+			path,
+			fmt.Errorf("no state field in response"),
+		)
+	}
+
+	return state == "active", nil
+}
+
 // IsMergeQueueEnabled checks if merge queue is enabled for a branch
 func (c *Client) IsMergeQueueEnabled(ctx context.Context, owner, repo, branch string) (bool, error) {
 	path := fmt.Sprintf("/repos/%s/%s/branches/%s/protection", owner, repo, branch)
