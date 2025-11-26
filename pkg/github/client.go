@@ -743,10 +743,16 @@ func (c *Client) IsTeamMember(ctx context.Context, org, teamSlug, username strin
 
 	data, err := c.makeRequest(ctx, "GET", path, nil)
 	if err != nil {
-		// 404 means user is not a member
 		var apiErr *APIError
-		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
-			return false, nil
+		if errors.As(err, &apiErr) {
+			// 404 means user is not a member
+			if apiErr.StatusCode == 404 {
+				return false, nil
+			}
+			// 403 likely means insufficient permissions (missing read:org or members:read)
+			if apiErr.StatusCode == 403 {
+				return false, fmt.Errorf("insufficient permissions to check team membership (need read:org or members:read scope): %w", err)
+			}
 		}
 		return false, err
 	}
