@@ -730,8 +730,25 @@ func executeMerge(ctx context.Context, client *github.Client, rc *RuntimeConfig,
 	}
 
 	// Check if PR is mergeable
+	// If blocked by branch protection or unstable (failing checks), try enabling auto-merge
+	// Only return "not mergeable" for actual conflicts (dirty state)
 	if !info.Mergeable {
-		return feedback.NewNotMergeable(), nil
+		switch info.MergeableState {
+		case github.MergeableStateBlocked, github.MergeableStateUnstable:
+			// Branch protection or failing checks - enable auto-merge
+			return enableAutoMerge(ctx, client, rc, bc, prNum, method)
+
+		case github.MergeableStateDirty:
+			// Actual conflicts - cannot merge
+			return feedback.NewNotMergeable(), nil
+
+		case github.MergeableStateUnknown, "":
+			// Unknown state - try to merge anyway and let it fail with specific error
+			// This handles the case where GitHub hasn't computed mergeability yet
+
+		default:
+			return feedback.NewNotMergeable(), nil
+		}
 	}
 
 	// Check if bot already approved the PR (prevents duplicate approvals from edits/reactions)

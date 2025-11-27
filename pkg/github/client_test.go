@@ -330,6 +330,80 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("404"))
 			})
+
+			It("should parse mergeable_state field", func() {
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+
+					Expect(r.Method).To(Equal("GET"))
+
+					switch r.URL.Path {
+					case "/repos/owner/repo/pulls/1":
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode(map[string]interface{}{
+							"number":          1,
+							"state":           "open",
+							"mergeable":       false,
+							"mergeable_state": "blocked",
+							"title":           "Test PR",
+							"user": map[string]interface{}{
+								"login": "testuser",
+							},
+						})
+					case "/repos/owner/repo/pulls/1/reviews":
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode([]map[string]interface{}{})
+					default:
+						Fail("unexpected request path: " + r.URL.Path)
+					}
+				}))
+
+				client, err := github.NewClient("test-token", server.URL)
+				Expect(err).NotTo(HaveOccurred())
+
+				info, err := client.GetPRInfo(context.Background(), "owner", "repo", 1)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(info.Mergeable).To(BeFalse())
+				Expect(info.MergeableState).To(Equal(github.MergeableStateBlocked))
+			})
+
+			It("should handle all mergeable_state values", func() {
+				testCases := []struct {
+					state    string
+					expected github.MergeableState
+				}{
+					{"clean", github.MergeableStateClean},
+					{"dirty", github.MergeableStateDirty},
+					{"blocked", github.MergeableStateBlocked},
+					{"unstable", github.MergeableStateUnstable},
+					{"unknown", github.MergeableStateUnknown},
+				}
+
+				for _, tc := range testCases {
+					server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						switch r.URL.Path {
+						case "/repos/owner/repo/pulls/1":
+							w.WriteHeader(http.StatusOK)
+							_ = json.NewEncoder(w).Encode(map[string]interface{}{
+								"number":          1,
+								"mergeable_state": tc.state,
+							})
+						case "/repos/owner/repo/pulls/1/reviews":
+							w.WriteHeader(http.StatusOK)
+							_ = json.NewEncoder(w).Encode([]map[string]interface{}{})
+						}
+					}))
+
+					client, err := github.NewClient("test-token", server.URL)
+					Expect(err).NotTo(HaveOccurred())
+
+					info, err := client.GetPRInfo(context.Background(), "owner", "repo", 1)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(info.MergeableState).To(Equal(tc.expected), "failed for state: "+tc.state)
+
+					server.Close()
+				}
+			})
 		})
 	})
 

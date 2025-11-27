@@ -1,5 +1,25 @@
 package github
 
+// MergeableState represents the merge state of a PR from GitHub REST API
+type MergeableState string
+
+const (
+	// MergeableStateClean indicates PR can be merged
+	MergeableStateClean MergeableState = "clean"
+
+	// MergeableStateDirty indicates PR has conflicts
+	MergeableStateDirty MergeableState = "dirty"
+
+	// MergeableStateBlocked indicates PR is blocked by branch protection
+	MergeableStateBlocked MergeableState = "blocked"
+
+	// MergeableStateUnstable indicates PR has failing status checks
+	MergeableStateUnstable MergeableState = "unstable"
+
+	// MergeableStateUnknown indicates mergeability not yet computed
+	MergeableStateUnknown MergeableState = "unknown"
+)
+
 // PRInfo contains information about a pull request
 type PRInfo struct {
 	// Number is the PR number
@@ -8,8 +28,11 @@ type PRInfo struct {
 	// State is the current state (open, closed, merged)
 	State string
 
-	// Mergeable indicates whether the PR can be merged
+	// Mergeable indicates whether the PR can be merged (no conflicts)
 	Mergeable bool
+
+	// MergeableState provides detailed merge state (clean, dirty, blocked, unstable, unknown)
+	MergeableState MergeableState
 
 	// Author is the username of the PR author
 	Author string

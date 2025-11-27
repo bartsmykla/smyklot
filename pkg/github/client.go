@@ -569,6 +569,10 @@ func (c *Client) GetPRInfo(ctx context.Context, owner, repo string, prNumber int
 		info.Mergeable = mergeable
 	}
 
+	if mergeableState, ok := response["mergeable_state"].(string); ok {
+		info.MergeableState = MergeableState(mergeableState)
+	}
+
 	if title, ok := response["title"].(string); ok {
 		info.Title = title
 	}
