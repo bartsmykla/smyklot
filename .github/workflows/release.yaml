@@ -36,8 +36,15 @@ jobs:
       - name: Run tests
         run: task test
 
-      - name: Run linters
-        run: task lint
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        with:
+          version: latest
+
+      - name: Run other linters
+        run: |
+          task lint:markdown
+          task lint:mod
 
   # Determine if a release should be created
   release:

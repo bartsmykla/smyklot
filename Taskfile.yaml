@@ -88,8 +88,13 @@ tasks:
     desc: Lint Go code
     cmds:
       - echo "▶ Linting Go code"
-      - golangci-lint run ./...
-      - echo "✓ Go code passes linting"
+      - |
+        if [ -n "$CI" ]; then
+          echo "⊘ Skipping golangci-lint in CI (using golangci-lint-action instead)"
+        else
+          golangci-lint run ./...
+          echo "✓ Go code passes linting"
+        fi
 
   lint:markdown:
     desc: Lint Markdown files
