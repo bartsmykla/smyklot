@@ -1,0 +1,5 @@
+# CI-specific mise configuration
+# Activated by setting MISE_ENV=ci in GitHub Actions
+
+[env]
+CGO_ENABLED = "1"  # Required for -race flag in tests
