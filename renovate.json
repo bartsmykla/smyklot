@@ -6,5 +6,6 @@
     ":label(dependencies)",
     ":enableVulnerabilityAlerts",
     ":disableRateLimiting"
-  ]
+  ],
+  "rebaseWhen": "conflicted"
 }
