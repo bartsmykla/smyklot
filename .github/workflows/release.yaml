@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      CGO_ENABLED: 1
 
     steps:
       - name: Checkout
@@ -33,8 +35,6 @@ jobs:
 
       - name: Run tests
         run: task test
-        env:
-          CGO_ENABLED: 1
 
       - name: Run linters
         run: task lint
