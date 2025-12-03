@@ -4,57 +4,66 @@ This document describes the release process for Smyklot.
 
 ## Release Process Overview
 
-Smyklot uses **automated releases** with semantic versioning. Releases are triggered automatically based on conventional commit messages.
+Smyklot uses **semantic-release** with label-triggered releases. Releases are triggered when a PR with a `release` label is merged to `main`, or automatically via scheduled/manual runs.
 
-### Automated Release (Recommended)
+### Label-Triggered Release (Primary)
 
-The `auto-release.yaml` workflow runs **daily at 10:00 UTC** and automatically:
+Add the `release` label to any PR. When the PR is merged to `main`, the release workflow automatically:
 
-1. Analyzes commits since the last release
-2. Determines the next version using semantic versioning
-3. Creates a release commit and tag
-4. Triggers the release workflow to build and publish
+1. Runs tests and linters
+2. Analyzes commits to determine version bump
+3. Generates changelog from conventional commits
+4. Updates `action.yml` with new Docker image tag
+5. Creates release commit and tag
+6. Builds and publishes binaries and Docker images
 
 **Version Bumping Rules**:
 
 - **Major** (X.0.0): Commits with `BREAKING CHANGE` or `!` suffix (e.g., `feat!: ...`)
-- **Minor** (0.X.0): Commits with `feat:` or `feat(...):` prefix
-- **Patch** (0.0.X): Commits with `fix:` or other types
+- **Minor** (0.X.0): Commits with `feat:` prefix
+- **Patch** (0.0.X): Commits with `fix:`, `perf:`, or `refactor:` prefix
+- **No release**: Commits with `docs:`, `style:`, `chore:`, `test:`, `ci:`, `build:` prefix
 
 **Example**:
 
 ```bash
 # Current version: 1.7.8
 
-# These commits trigger a minor bump (1.8.0):
+# Open PR with these commits:
 git commit -sS -m "feat(api): add new approval endpoint"
 git commit -sS -m "fix(parser): handle edge case"
 
-# These commits trigger a major bump (2.0.0):
-git commit -sS -m "feat!: redesign approval system"
-git commit -sS -m "feat: add feature
+# Add "release" label to PR
+gh pr edit 123 --add-label release
 
-BREAKING CHANGE: removed legacy API"
+# Merge PR → triggers release → version bumps to 1.8.0
 ```
+
+**Alternative release labels**:
+
+- `release` — semantic-release determines version automatically
+- `release/major` — force major bump (X.0.0)
+- `release/minor` — force minor bump (0.X.0)
+- `release/patch` — force patch bump (0.0.X)
+
+### Scheduled Release
+
+The release workflow runs **daily at 10:00 UTC** as a safety net. If new releasable commits exist since the last release, a new version is created automatically.
 
 ### Manual Release
 
-You can trigger a release manually:
+Trigger a release manually via GitHub Actions:
 
 1. **Via GitHub Actions UI**:
-   - Go to Actions → Auto Release
+   - Go to Actions → Release
    - Click "Run workflow"
-   - Optionally specify a version (e.g., `1.9.0`)
+   - Select branch: `main`
    - Click "Run workflow"
 
 2. **Via Command Line**:
 
    ```bash
-   # Trigger automated version bump
-   gh workflow run auto-release.yaml
-
-   # Trigger with specific version
-   gh workflow run auto-release.yaml -f version=1.9.0
+   gh workflow run release.yaml
    ```
 
 ### Release Artifacts
@@ -73,51 +82,51 @@ Each release produces:
 
 3. **Checksums**: `checksums.txt` for all archives
 
-4. **Changelog**: Auto-generated from conventional commits
+4. **Changelog**: `CHANGELOG.md` generated from conventional commits
 
 ## Release Workflow Details
 
-### 1. Auto-Release Workflow (`.github/workflows/auto-release.yaml`)
+### 1. Release Workflow (`.github/workflows/release.yaml`)
 
-**Trigger**: Daily at 10:00 UTC or manual dispatch
+**Triggers**:
 
-**Steps**:
+- **PR merge** with `release`, `release/major`, `release/minor`, or `release/patch` label
+- **Scheduled** daily at 10:00 UTC
+- **Manual** via `workflow_dispatch`
 
-1. Generate GitHub App token for authenticated operations
-2. Checkout repository with full history
-3. Determine next version using semantic versioning
-4. Check if release is needed (skip if no new commits)
-5. Update `action.yml` with new Docker image tag
-6. Create verified commit via GitHub API
-7. Create signed tag via GitHub API
-8. Push tag to trigger release workflow
+**Jobs**:
 
-**Secrets Required**:
-
-- `SMYKLOT_APP_ID` - GitHub App ID
-- `SMYKLOT_PRIVATE_KEY` - GitHub App private key
-
-### 2. Release Workflow (`.github/workflows/release.yaml`)
-
-**Trigger**: Push of tag matching `v*.*.*`
-
-**Steps**:
-
-1. Checkout code with full history
-2. Install mise and set up toolchain
-3. Set up Docker Buildx for multi-arch builds
-4. Login to GitHub Container Registry
-5. Run GoReleaser to:
-   - Build binaries for all platforms
-   - Create archives
-   - Build and push Docker images
-   - Generate changelog
-   - Create GitHub Release
+1. **Test**: Runs tests and linters (always runs first)
+2. **Semantic Release**: Analyzes commits, creates version, updates files, tags release
+3. **GoReleaser**: Builds binaries and Docker images (only if new release created)
 
 **Secrets Required**:
 
-- `GHCR_TOKEN` - GitHub Container Registry token
-- `GITHUB_TOKEN` - Auto-provided by GitHub Actions
+- `SMYKLOT_APP_ID` — GitHub App ID (for generating token)
+- `SMYKLOT_PRIVATE_KEY` — GitHub App private key (for generating token)
+- `GHCR_TOKEN` — GitHub Container Registry token (for Docker push)
+
+**Bot Identity**:
+
+- Author/Committer: `smyklot[bot]`
+- Email: `205507218+smyklot[bot]@users.noreply.github.com`
+
+### 2. semantic-release Configuration (`.releaserc.yml`)
+
+**Plugins**:
+
+- `@semantic-release/commit-analyzer` — analyzes commits for version bump
+- `@semantic-release/release-notes-generator` — generates changelog content
+- `@semantic-release/changelog` — updates `CHANGELOG.md`
+- `@semantic-release/exec` — updates `action.yml` with new version
+- `@semantic-release/git` — commits changes and creates tag
+- `@semantic-release/github` — creates GitHub release
+
+**Commit Analysis**:
+
+- Uses `conventionalcommits` preset
+- Commits grouped by: Features, Bug Fixes, Performance Improvements, Code Refactoring
+- Excludes from changelog: `docs:`, `style:`, `chore:`, `test:`, `ci:`, `build:`
 
 ### 3. GoReleaser Configuration (`.goreleaser.yml`)
 
@@ -135,8 +144,8 @@ Each release produces:
 
 **Changelog**:
 
-- Groups commits by: Features, Bug Fixes, Performance Improvements
-- Excludes: `docs:`, `test:`, `ci:`, `chore:`, `build:`
+- Generated by semantic-release (GoReleaser uses existing `CHANGELOG.md`)
+- GitHub release metadata created automatically
 
 ## Checking Release Status
 
@@ -152,38 +161,82 @@ git tag --list 'v*' --sort=-version:refname | head -1
 
 # View recent release commits
 git log --oneline --grep='chore(release)' -5
+
+# Check if PR has release label
+gh pr view 123 --json labels --jq '.labels[].name'
+```
+
+## Adding Release Label to PRs
+
+```bash
+# Add release label to current PR
+gh pr edit --add-label release
+
+# Add release label to specific PR
+gh pr edit 123 --add-label release
+
+# Force major version bump
+gh pr edit 123 --add-label release/major
+
+# Force minor version bump
+gh pr edit 123 --add-label release/minor
+
+# Force patch version bump
+gh pr edit 123 --add-label release/patch
 ```
 
 ## Troubleshooting
 
+### Release workflow not triggered
+
+1. Verify PR has `release` label before merge
+2. Check PR was merged to `main` branch
+3. Verify workflow triggers in `.github/workflows/release.yaml`
+
 ### Release workflow failed
 
 1. Check GitHub Actions logs
-2. Verify secrets are configured correctly
-3. Ensure GoReleaser configuration is valid: `goreleaser check`
+2. Verify secrets are configured correctly:
+   - `SMYKLOT_APP_ID` (repository variable)
+   - `SMYKLOT_PRIVATE_KEY` (repository secret)
+   - `GHCR_TOKEN` (repository secret)
+3. Ensure semantic-release configuration is valid
+4. Check commit messages follow conventional format
 
 ### Docker image not updated
 
-1. Verify GHCR_TOKEN has `write:packages` permission
-2. Check Docker build logs in release workflow
-3. Manually trigger release workflow: `gh workflow run release.yaml`
+1. Verify `GHCR_TOKEN` has `write:packages` permission
+2. Check Docker build logs in GoReleaser job
+3. Verify semantic-release created new tag
+4. Check GoReleaser job ran (depends on semantic-release output)
 
-### Version not bumped
+### Version not bumped as expected
 
 1. Ensure commits use conventional commit format
-2. Check auto-release workflow logs for version calculation
-3. Manually specify version: `gh workflow run auto-release.yaml -f version=X.Y.Z`
+2. Check commit-analyzer rules in `.releaserc.yml`
+3. Verify no duplicate tags exist
+4. Use force labels (`release/major`, `release/minor`, `release/patch`) if needed
+
+### Changelog not updated
+
+1. Verify `CHANGELOG.md` exists in repository
+2. Check semantic-release logs for changelog generation
+3. Ensure commits have proper conventional format
+4. Check changelog configuration in `.releaserc.yml`
 
 ## Version File Locations
 
-- `action.yml` - Docker image tag (updated by auto-release)
-- Git tags - Source of truth for releases (e.g., `v1.7.8`)
-- GitHub Releases - Published artifacts and changelog
+- `action.yml` — Docker image tag (updated by semantic-release)
+- `CHANGELOG.md` — Release notes (updated by semantic-release)
+- Git tags — Source of truth for releases (e.g., `v1.7.8`)
+- GitHub Releases — Published artifacts and changelog
 
 ## Best Practices
 
-1. **Use conventional commits**: Ensures correct version bumping
-2. **Test before merging**: CI runs on every push
-3. **Review changelogs**: Auto-generated but should be reviewed
-4. **Monitor releases**: Check GitHub Actions for failures
-5. **Update dependencies**: Keep GoReleaser and actions up to date
+1. **Use conventional commits**: Ensures correct version bumping and changelog generation
+2. **Add release label to PRs**: Primary release trigger
+3. **Test before merging**: CI runs on every push
+4. **Review changelogs**: Auto-generated but should be reviewed post-release
+5. **Monitor releases**: Check GitHub Actions for failures
+6. **Update dependencies**: Keep semantic-release, GoReleaser, and actions up to date
+7. **Use force labels sparingly**: Let semantic-release determine version automatically
