@@ -33,6 +33,8 @@ jobs:
 
       - name: Run tests
         run: task test
+        env:
+          CGO_ENABLED: 1
 
       - name: Run linters
         run: task lint
@@ -65,7 +67,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
         with:
-          app-id: ${{ vars.SMYKLOT_APP_ID }}
+          app-id: ${{ secrets.SMYKLOT_APP_ID }}
           private-key: ${{ secrets.SMYKLOT_PRIVATE_KEY }}
 
       - name: Checkout
