@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/bartsmykla/smyklot/pkg/config"
+	"github.com/bartsmykla/smyklot/pkg/feedback"
 	"github.com/bartsmykla/smyklot/pkg/github"
 	"github.com/bartsmykla/smyklot/pkg/permissions"
 )
@@ -211,6 +212,11 @@ func pollAllPRs(
 		}
 	}
 
+	// Process pending-ci PRs (waiting for CI to pass before merge)
+	if err := processPendingCIPRs(ctx, client, bc, repoOwner, repoName, prs); err != nil {
+		fmt.Fprintf(os.Stderr, "  Warning: failed to process pending-ci PRs: %v\n", err)
+	}
+
 	fmt.Println("\nPolling complete")
 
 	return nil
@@ -262,6 +268,227 @@ func processPR(
 			return fmt.Errorf("failed to process reactions on PR #%d: %w", prNumber, err)
 		}
 	}
+
+	return nil
+}
+
+// processPendingCIPRs processes PRs that are waiting for CI to pass before merge
+//
+// It queries PRs with pending-ci labels, checks their CI status, and:
+// - Merges if CI passes
+// - Removes label and posts failure feedback if CI fails
+// - Skips if CI is still pending
+//
+//nolint:unparam // error return kept for consistent function signature and future error handling
+func processPendingCIPRs(
+	ctx context.Context,
+	client *github.Client,
+	bc *config.Config,
+	repoOwner, repoName string,
+	prs []map[string]interface{},
+) error {
+	// Filter PRs with pending-ci labels
+	pendingPRs := filterPendingCIPRs(prs)
+
+	if len(pendingPRs) == 0 {
+		return nil
+	}
+
+	fmt.Printf("\nProcessing %d PR(s) waiting for CI\n", len(pendingPRs))
+
+	for _, pr := range pendingPRs {
+		if err := processPendingCIPR(ctx, client, bc, repoOwner, repoName, pr); err != nil {
+			prNum := extractPRNumber(pr.prData)
+			fmt.Fprintf(os.Stderr, "  Warning: failed to process pending-ci PR #%d: %v\n", prNum, err)
+		}
+	}
+
+	return nil
+}
+
+// pendingCIPR holds data about a PR waiting for CI
+type pendingCIPR struct {
+	prData map[string]interface{}
+	method github.MergeMethod
+	label  string
+}
+
+// filterPendingCIPRs filters PRs that have pending-ci labels
+func filterPendingCIPRs(prs []map[string]interface{}) []pendingCIPR {
+	var result []pendingCIPR
+
+	for _, pr := range prs {
+		labels, ok := pr["labels"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, l := range labels {
+			labelMap, ok := l.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			labelName, ok := labelMap["name"].(string)
+			if !ok {
+				continue
+			}
+
+			method, label := parsePendingCILabel(labelName)
+			if label != "" {
+				result = append(result, pendingCIPR{
+					prData: pr,
+					method: method,
+					label:  label,
+				})
+
+				break // Only one pending-ci label per PR
+			}
+		}
+	}
+
+	return result
+}
+
+// parsePendingCILabel parses a pending-ci label and returns the merge method
+//
+// Returns:
+// - MergeMethod and label name if valid pending-ci label
+// - Empty string if not a pending-ci label
+func parsePendingCILabel(label string) (github.MergeMethod, string) {
+	switch label {
+	case github.LabelPendingCIMerge:
+		return github.MergeMethodMerge, label
+	case github.LabelPendingCISquash:
+		return github.MergeMethodSquash, label
+	case github.LabelPendingCIRebase:
+		return github.MergeMethodRebase, label
+	default:
+		return "", ""
+	}
+}
+
+// extractPRNumber extracts PR number from PR data
+func extractPRNumber(pr map[string]interface{}) int {
+	if num, ok := pr["number"].(float64); ok {
+		return int(num)
+	}
+
+	return 0
+}
+
+// processPendingCIPR processes a single PR waiting for CI
+func processPendingCIPR(
+	ctx context.Context,
+	client *github.Client,
+	bc *config.Config,
+	repoOwner, repoName string,
+	pr pendingCIPR,
+) error {
+	prNumber := extractPRNumber(pr.prData)
+	if prNumber == 0 {
+		return fmt.Errorf("invalid PR number")
+	}
+
+	fmt.Printf("  Checking CI status for PR #%d (method: %s)\n", prNumber, pr.method)
+
+	// Get PR head SHA for CI status check
+	headRef, err := client.GetPRHeadRef(ctx, repoOwner, repoName, prNumber)
+	if err != nil {
+		return fmt.Errorf("failed to get PR head ref: %w", err)
+	}
+
+	// Check current CI status
+	checkStatus, err := client.GetCheckStatus(ctx, repoOwner, repoName, headRef)
+	if err != nil {
+		return fmt.Errorf("failed to get CI status: %w", err)
+	}
+
+	// Handle based on CI status
+	switch {
+	case checkStatus.AllPassing:
+		return handlePendingCIPassed(ctx, client, bc, repoOwner, repoName, prNumber, pr)
+
+	case checkStatus.Failing:
+		return handlePendingCIFailed(ctx, client, bc, repoOwner, repoName, prNumber, pr, checkStatus.Summary)
+
+	default:
+		// CI still pending, skip
+		fmt.Printf("    CI still pending: %s\n", checkStatus.Summary)
+
+		return nil
+	}
+}
+
+// handlePendingCIPassed handles a PR where CI has passed
+func handlePendingCIPassed(
+	ctx context.Context,
+	client *github.Client,
+	bc *config.Config,
+	repoOwner, repoName string,
+	prNumber int,
+	pr pendingCIPR,
+) error {
+	fmt.Printf("    CI passed! Merging PR #%d\n", prNumber)
+
+	// Merge the PR
+	if err := client.MergePR(ctx, repoOwner, repoName, prNumber, pr.method); err != nil {
+		// Try fallback methods if merge commits not allowed
+		if pr.method == github.MergeMethodMerge && strings.Contains(err.Error(), "Merge commits are not allowed") {
+			if err := client.MergePR(ctx, repoOwner, repoName, prNumber, github.MergeMethodSquash); err != nil {
+				if err := client.MergePR(ctx, repoOwner, repoName, prNumber, github.MergeMethodRebase); err != nil {
+					return postPendingCIError(ctx, client, repoOwner, repoName, prNumber, pr.label, err.Error())
+				}
+			}
+		} else {
+			return postPendingCIError(ctx, client, repoOwner, repoName, prNumber, pr.label, err.Error())
+		}
+	}
+
+	// Remove pending-ci label
+	_ = client.RemoveLabel(ctx, repoOwner, repoName, prNumber, pr.label)
+
+	// Post success feedback
+	// We don't know who requested the merge, so use a generic message
+	fb := feedback.NewPendingCIMerged("automation", bc.QuietSuccess)
+	if fb.RequiresComment() {
+		_ = client.PostComment(ctx, repoOwner, repoName, prNumber, fb.Message)
+	}
+
+	return nil
+}
+
+// handlePendingCIFailed handles a PR where CI has failed
+//
+//nolint:unparam // bc kept for API consistency with handlePendingCIPassed
+func handlePendingCIFailed(
+	ctx context.Context,
+	client *github.Client,
+	_ *config.Config, // kept for API consistency with handlePendingCIPassed
+	repoOwner, repoName string,
+	prNumber int,
+	pr pendingCIPR,
+	summary string,
+) error {
+	fmt.Printf("    CI failed: %s\n", summary)
+
+	return postPendingCIError(ctx, client, repoOwner, repoName, prNumber, pr.label, summary)
+}
+
+// postPendingCIError posts error feedback and removes label for failed pending-ci
+func postPendingCIError(
+	ctx context.Context,
+	client *github.Client,
+	repoOwner, repoName string,
+	prNumber int,
+	label, reason string,
+) error {
+	// Remove pending-ci label
+	_ = client.RemoveLabel(ctx, repoOwner, repoName, prNumber, label)
+
+	// Post failure feedback
+	fb := feedback.NewPendingCIFailed(reason)
+	_ = client.PostComment(ctx, repoOwner, repoName, prNumber, fb.Message)
 
 	return nil
 }
