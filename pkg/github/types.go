@@ -74,6 +74,9 @@ const (
 
 	// ReactionCleanup represents cleanup command (❤️)
 	ReactionCleanup ReactionType = "heart"
+
+	// ReactionPendingCI represents waiting for CI (⏳)
+	ReactionPendingCI ReactionType = "hourglass"
 )
 
 // Reaction represents a reaction on a comment
@@ -94,6 +97,15 @@ const (
 
 	// LabelReactionCleanup indicates cleanup was triggered via ❤️ reaction
 	LabelReactionCleanup = "smyklot:reaction-cleanup"
+
+	// LabelPendingCIMerge indicates PR is waiting for CI before merge
+	LabelPendingCIMerge = "smyklot:pending-ci"
+
+	// LabelPendingCISquash indicates PR is waiting for CI before squash merge
+	LabelPendingCISquash = "smyklot:pending-ci:squash"
+
+	// LabelPendingCIRebase indicates PR is waiting for CI before rebase merge
+	LabelPendingCIRebase = "smyklot:pending-ci:rebase"
 )
 
 // MergeMethod represents the type of merge method to use
