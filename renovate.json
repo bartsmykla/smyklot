@@ -5,6 +5,6 @@
     ":gitSignOff",
     ":label(dependencies)",
     ":enableVulnerabilityAlerts",
-    ":prConcurrentLimit20"
+    ":disableRateLimiting"
   ]
 }
