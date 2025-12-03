@@ -18,6 +18,11 @@ var (
 	// mentionCommandRegex matches @smyklot command patterns
 	mentionCommandRegex = regexp.MustCompile(`(?i)@smyklot\s+(\w+)`)
 
+	// waitForCIRegex matches "after CI" modifier phrases
+	// Patterns: "after CI", "after checks", "when green", "when CI passes",
+	// "when checks pass", "once CI passes", "once checks pass"
+	waitForCIRegex = regexp.MustCompile(`(?i)\b(?:after|when|once)\s+(?:CI|checks?|green)(?:\s+(?:pass(?:es)?|are?\s+green))?\b`)
+
 	// validCommands maps command names to their corresponding types
 	validCommands = map[string]CommandType{
 		"approve":    CommandApprove,
@@ -111,6 +116,11 @@ func ParseCommand(commentBody string, cfg *config.Config) (Command, error) {
 		cmd.Commands = commands
 		cmd.Type = commands[0] // For backward compatibility
 		cmd.IsValid = true
+
+		// Check for "after CI" modifier - only applies to merge commands
+		if hasMergeCommand(commands) && detectWaitForCIModifier(commentBody) {
+			cmd.WaitForCI = true
+		}
 	}
 
 	return cmd, nil
@@ -426,4 +436,27 @@ func resolveCommand(commandName string, cfg *config.Config) CommandType {
 	}
 
 	return cmdType
+}
+
+// detectWaitForCIModifier checks if the comment contains "after CI" modifier phrases
+// Matches patterns like: "after CI", "when green", "when checks pass",
+// "once CI passes", "after checks", etc.
+func detectWaitForCIModifier(text string) bool {
+	return waitForCIRegex.MatchString(text)
+}
+
+// isMergeCommand checks if a command type is a merge-related command
+func isMergeCommand(cmdType CommandType) bool {
+	return cmdType == CommandMerge || cmdType == CommandSquash || cmdType == CommandRebase
+}
+
+// hasMergeCommand checks if any merge-related command is present
+func hasMergeCommand(commands []CommandType) bool {
+	for _, cmd := range commands {
+		if isMergeCommand(cmd) {
+			return true
+		}
+	}
+
+	return false
 }

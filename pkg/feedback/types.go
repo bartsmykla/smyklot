@@ -15,6 +15,10 @@ const (
 	// Warning represents a non-critical issue
 	// Response: Emoji reaction (⚠️) + informative comment
 	Warning Type = "warning"
+
+	// Pending represents an operation waiting for external condition
+	// Response: Emoji reaction (⏳) + informative comment
+	Pending Type = "pending"
 )
 
 // Feedback represents a response to a command

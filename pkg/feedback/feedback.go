@@ -445,6 +445,65 @@ func NewReactionMergeRemoved() *Feedback {
 	}
 }
 
+// NewPendingCI creates pending feedback for when merge is waiting for CI
+//
+// The message indicates who triggered the merge and what merge method will be used
+func NewPendingCI(author string, method string) *Feedback {
+	message := fmt.Sprintf(
+		"⏳ **Waiting for CI**\n\n"+
+			"Merge requested by `%s`. Will %s when all checks pass.\n\n"+
+			"The PR will be merged automatically once CI succeeds.",
+		author,
+		method,
+	)
+
+	return &Feedback{
+		Type:    Pending,
+		Emoji:   "⏳",
+		Message: message,
+	}
+}
+
+// NewPendingCIMerged creates success feedback for when a pending-ci merge completes
+//
+// The message indicates that CI passed and the PR was merged
+func NewPendingCIMerged(author string, quietSuccess bool) *Feedback {
+	message := ""
+
+	if !quietSuccess {
+		message = fmt.Sprintf(
+			"✅ **CI Passed - PR Merged**\n\n"+
+				"All checks passed! PR has been merged as requested by `%s`.",
+			author,
+		)
+	}
+
+	return &Feedback{
+		Type:    Success,
+		Emoji:   "✅",
+		Message: message,
+	}
+}
+
+// NewPendingCIFailed creates error feedback for when pending-ci merge is cancelled due to CI failure
+//
+// The reason parameter should describe why CI failed or what checks failed
+func NewPendingCIFailed(reason string) *Feedback {
+	message := fmt.Sprintf(
+		"❌ **CI Failed - Merge Cancelled**\n\n"+
+			"The pending merge has been cancelled because CI checks failed.\n\n"+
+			"**Reason:** %s\n\n"+
+			"Please fix the failing checks and try again.",
+		reason,
+	)
+
+	return &Feedback{
+		Type:    Error,
+		Emoji:   "❌",
+		Message: message,
+	}
+}
+
 // NewHelp creates help feedback with usage instructions
 func NewHelp() *Feedback {
 	message := "ℹ️ **Smyklot Bot - Help**\n\n" +
@@ -454,7 +513,15 @@ func NewHelp() *Feedback {
 		"- `/approve` or `@smyklot approve` or `approve` - Approve the PR\n" +
 		"- `accept` or `lgtm` - Alternative ways to approve\n\n" +
 		"**Merge Commands:**\n" +
-		"- `/merge` or `@smyklot merge` or `merge` - Merge the PR\n\n" +
+		"- `/merge` or `@smyklot merge` or `merge` - Merge the PR\n" +
+		"- `/squash` - Squash and merge the PR\n" +
+		"- `/rebase` - Rebase and merge the PR\n\n" +
+		"**Merge After CI:**\n" +
+		"Add `after CI` to defer merge until checks pass:\n" +
+		"- `/merge after CI` - Merge after CI passes\n" +
+		"- `/squash when green` - Squash after checks are green\n" +
+		"- `/rebase once CI passes` - Rebase after CI passes\n" +
+		"The bot will add ⏳ reaction and merge automatically when CI succeeds.\n\n" +
 		"**Review Management:**\n" +
 		"- `/unapprove` or `@smyklot unapprove` or `unapprove` - Dismiss your approval\n" +
 		"- `disapprove` - Alternative way to unapprove\n\n" +

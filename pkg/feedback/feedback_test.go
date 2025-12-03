@@ -318,4 +318,88 @@ var _ = Describe("Feedback System [Unit]", func() {
 			Expect(combined.Message).To(ContainSubstring("Partial Success"))
 		})
 	})
+
+	Describe("Pending Type", func() {
+		It("should have Pending type", func() {
+			Expect(feedback.Pending).To(Equal(feedback.Type("pending")))
+		})
+	})
+
+	Describe("NewPendingCI", func() {
+		It("should create pending feedback with hourglass emoji", func() {
+			fb := feedback.NewPendingCI("alice", "merge")
+			Expect(fb.Type).To(Equal(feedback.Pending))
+			Expect(fb.Emoji).To(Equal("⏳"))
+			Expect(fb.Message).To(ContainSubstring("Waiting for CI"))
+			Expect(fb.Message).To(ContainSubstring("alice"))
+			Expect(fb.Message).To(ContainSubstring("merge"))
+		})
+
+		It("should include different merge methods", func() {
+			methods := []string{"merge", "squash", "rebase"}
+
+			for _, method := range methods {
+				fb := feedback.NewPendingCI("bob", method)
+				Expect(fb.Message).To(ContainSubstring(method))
+			}
+		})
+
+		It("should indicate automatic merge on CI success", func() {
+			fb := feedback.NewPendingCI("alice", "merge")
+			Expect(fb.Message).To(ContainSubstring("automatically"))
+		})
+	})
+
+	Describe("NewPendingCIMerged", func() {
+		It("should create success feedback with message when quietSuccess=false", func() {
+			fb := feedback.NewPendingCIMerged("alice", false)
+			Expect(fb.Type).To(Equal(feedback.Success))
+			Expect(fb.Emoji).To(Equal("✅"))
+			Expect(fb.Message).To(ContainSubstring("CI Passed"))
+			Expect(fb.Message).To(ContainSubstring("PR Merged"))
+			Expect(fb.Message).To(ContainSubstring("alice"))
+		})
+
+		It("should create success feedback with emoji only when quietSuccess=true", func() {
+			fb := feedback.NewPendingCIMerged("alice", true)
+			Expect(fb.Type).To(Equal(feedback.Success))
+			Expect(fb.Emoji).To(Equal("✅"))
+			Expect(fb.Message).To(BeEmpty())
+		})
+
+		It("should indicate checks passed", func() {
+			fb := feedback.NewPendingCIMerged("bob", false)
+			Expect(fb.Message).To(ContainSubstring("checks passed"))
+		})
+	})
+
+	Describe("NewPendingCIFailed", func() {
+		It("should create error feedback with reason", func() {
+			fb := feedback.NewPendingCIFailed("3 checks failed")
+			Expect(fb.Type).To(Equal(feedback.Error))
+			Expect(fb.Emoji).To(Equal("❌"))
+			Expect(fb.Message).To(ContainSubstring("CI Failed"))
+			Expect(fb.Message).To(ContainSubstring("Merge Cancelled"))
+			Expect(fb.Message).To(ContainSubstring("3 checks failed"))
+		})
+
+		It("should suggest fixing checks", func() {
+			fb := feedback.NewPendingCIFailed("tests failing")
+			Expect(fb.Message).To(ContainSubstring("fix"))
+			Expect(fb.Message).To(ContainSubstring("try again"))
+		})
+
+		It("should handle different failure reasons", func() {
+			reasons := []string{
+				"2 of 5 checks failed",
+				"CI timed out",
+				"build error in workflow",
+			}
+
+			for _, reason := range reasons {
+				fb := feedback.NewPendingCIFailed(reason)
+				Expect(fb.Message).To(ContainSubstring(reason))
+			}
+		})
+	})
 })

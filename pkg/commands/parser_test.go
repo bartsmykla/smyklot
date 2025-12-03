@@ -782,5 +782,382 @@ All changes tested:
 				Expect(cmd.IsValid).To(BeFalse())
 			})
 		})
+
+		Context("when parsing 'after CI' modifier with merge commands", func() {
+			// Basic slash command variations
+			It("should parse '/merge after CI' with WaitForCI=true", func() {
+				cmd, err := commands.ParseCommand("/merge after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse '/squash after CI' with WaitForCI=true", func() {
+				cmd, err := commands.ParseCommand("/squash after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse '/rebase after CI' with WaitForCI=true", func() {
+				cmd, err := commands.ParseCommand("/rebase after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandRebase))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			// Case insensitivity
+			It("should be case-insensitive for 'after ci'", func() {
+				cmd, err := commands.ParseCommand("/merge after ci", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should be case-insensitive for 'AFTER CI'", func() {
+				cmd, err := commands.ParseCommand("/merge AFTER CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should be case-insensitive for 'After Ci'", func() {
+				cmd, err := commands.ParseCommand("/merge After Ci", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// "when green" variations
+			It("should parse '/merge when green'", func() {
+				cmd, err := commands.ParseCommand("/merge when green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse '/squash when green'", func() {
+				cmd, err := commands.ParseCommand("/squash when green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// "when checks pass" variations
+			It("should parse '/merge when checks pass'", func() {
+				cmd, err := commands.ParseCommand("/merge when checks pass", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse '/merge when check passes'", func() {
+				cmd, err := commands.ParseCommand("/merge when check passes", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// "once CI passes" variations
+			It("should parse '/merge once CI passes'", func() {
+				cmd, err := commands.ParseCommand("/merge once CI passes", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse '/merge once checks pass'", func() {
+				cmd, err := commands.ParseCommand("/merge once checks pass", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// "after checks" variations
+			It("should parse '/merge after checks'", func() {
+				cmd, err := commands.ParseCommand("/merge after checks", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse '/merge after check'", func() {
+				cmd, err := commands.ParseCommand("/merge after check", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// "when CI passes" variation
+			It("should parse '/merge when CI passes'", func() {
+				cmd, err := commands.ParseCommand("/merge when CI passes", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// "checks are green" variation
+			It("should parse '/merge when checks are green'", func() {
+				cmd, err := commands.ParseCommand("/merge when checks are green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// Mention command variations
+			It("should parse '@smyklot merge after CI'", func() {
+				cmd, err := commands.ParseCommand("@smyklot merge after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse '@smyklot squash when green'", func() {
+				cmd, err := commands.ParseCommand("@smyklot squash when green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// Bare command variations
+			// Note: Bare commands with "after CI" modifier contain natural language
+			// words like "after", "when", "once" which trigger the natural language
+			// detection filter. This is expected behavior - users should use slash
+			// or mention commands for the modifier syntax.
+			It("should NOT parse 'merge after CI' as bare command due to natural language detection", func() {
+				cmd, err := commands.ParseCommand("merge after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				// "after" is a natural language indicator, so bare command parsing is skipped
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should NOT parse 'squash when green' as bare command due to natural language detection", func() {
+				cmd, err := commands.ParseCommand("squash when green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				// "when" is a natural language indicator, so bare command parsing is skipped
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			// Combined commands
+			It("should parse '/approve /merge after CI' with approve first", func() {
+				cmd, err := commands.ParseCommand("/approve /merge after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should NOT parse 'lgtm merge after CI' as bare command due to natural language detection", func() {
+				cmd, err := commands.ParseCommand("lgtm merge after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				// "after" is a natural language indicator, so bare command parsing is skipped
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			// Multiline
+			It("should parse modifier in multiline comment", func() {
+				cmd, err := commands.ParseCommand("/merge\nafter CI please", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse modifier when on separate line", func() {
+				comment := `/merge
+when checks pass`
+				cmd, err := commands.ParseCommand(comment, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+		})
+
+		Context("when 'after CI' modifier should NOT apply", func() {
+			// Regular merge without modifier
+			It("should NOT set WaitForCI for plain '/merge'", func() {
+				cmd, err := commands.ParseCommand("/merge", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			// Approve-only commands should not get WaitForCI
+			It("should NOT set WaitForCI for '/approve' even with modifier text", func() {
+				cmd, err := commands.ParseCommand("/approve after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandApprove))
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			It("should NOT set WaitForCI for 'lgtm' alone", func() {
+				cmd, err := commands.ParseCommand("lgtm", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			// Non-command text with CI-related words
+			It("should NOT parse as command: 'waiting for CI to pass'", func() {
+				cmd, err := commands.ParseCommand("waiting for CI to pass", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should NOT parse natural text mentioning CI", func() {
+				cmd, err := commands.ParseCommand("Let's merge this after CI is done", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.IsValid).To(BeFalse())
+			})
+
+			It("should NOT match partial phrases like 'after breakfast'", func() {
+				cmd, err := commands.ParseCommand("/merge after breakfast", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			It("should NOT match 'after lunch'", func() {
+				cmd, err := commands.ParseCommand("/merge after lunch", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			It("should NOT match 'when ready'", func() {
+				cmd, err := commands.ParseCommand("/merge when ready", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			// Cleanup command should not get WaitForCI
+			It("should NOT set WaitForCI for '/cleanup'", func() {
+				cmd, err := commands.ParseCommand("/cleanup after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandCleanup))
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			// Help command should not get WaitForCI
+			It("should NOT set WaitForCI for '/help'", func() {
+				cmd, err := commands.ParseCommand("/help after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandHelp))
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			// Unapprove should not get WaitForCI
+			It("should NOT set WaitForCI for '/unapprove'", func() {
+				cmd, err := commands.ParseCommand("/unapprove after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandUnapprove))
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+		})
+
+		Context("edge cases for 'after CI' regex matching", func() {
+			// Word boundary tests
+			It("should NOT match 'CIrcle' as CI", func() {
+				cmd, err := commands.ParseCommand("/merge after CIrcle", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			It("should NOT match 'checking' as check", func() {
+				cmd, err := commands.ParseCommand("/merge after checking", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			It("should NOT match 'greenhouse' as green", func() {
+				cmd, err := commands.ParseCommand("/merge when greenhouse", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeFalse())
+			})
+
+			// Whitespace variations
+			It("should handle multiple spaces between words", func() {
+				cmd, err := commands.ParseCommand("/merge after   CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				// \s+ matches one or more whitespace characters, so multiple spaces work
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should handle tabs between words", func() {
+				cmd, err := commands.ParseCommand("/merge after\tCI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				// Tab is whitespace, should match
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// Extra text around modifier
+			It("should match with text before modifier", func() {
+				cmd, err := commands.ParseCommand("/merge please after CI thanks", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should match with text after modifier", func() {
+				cmd, err := commands.ParseCommand("/merge after CI please", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// Punctuation
+			It("should match modifier followed by period", func() {
+				cmd, err := commands.ParseCommand("/merge after CI.", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should match modifier followed by exclamation", func() {
+				cmd, err := commands.ParseCommand("/merge after CI!", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// All variations of pass/passes
+			It("should match 'CI pass'", func() {
+				cmd, err := commands.ParseCommand("/merge when CI pass", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should match 'CI passes'", func() {
+				cmd, err := commands.ParseCommand("/merge when CI passes", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should match 'check pass'", func() {
+				cmd, err := commands.ParseCommand("/merge when check pass", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should match 'checks passes'", func() {
+				cmd, err := commands.ParseCommand("/merge when checks passes", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// "a green" vs "are green"
+			It("should match 'checks a green'", func() {
+				cmd, err := commands.ParseCommand("/merge when checks a green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should match 'checks are green'", func() {
+				cmd, err := commands.ParseCommand("/merge when checks are green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// After with just the keyword
+			It("should match 'after green'", func() {
+				cmd, err := commands.ParseCommand("/merge after green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should match 'once green'", func() {
+				cmd, err := commands.ParseCommand("/merge once green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+		})
 	})
 })
