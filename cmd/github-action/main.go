@@ -359,11 +359,11 @@ func run(cmd *cobra.Command, _ []string) error {
 		case commands.CommandApprove:
 			fb, err = executeApprove(ctx, client, rc, bc, prNum)
 		case commands.CommandMerge:
-			fb, err = executeMerge(ctx, client, rc, bc, prNum, github.MergeMethodMerge)
+			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodMerge, parsedCmd.WaitForCI)
 		case commands.CommandSquash:
-			fb, err = executeMerge(ctx, client, rc, bc, prNum, github.MergeMethodSquash)
+			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodSquash, parsedCmd.WaitForCI)
 		case commands.CommandRebase:
-			fb, err = executeMerge(ctx, client, rc, bc, prNum, github.MergeMethodRebase)
+			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodRebase, parsedCmd.WaitForCI)
 		case commands.CommandUnapprove:
 			fb, err = executeUnapprove(ctx, client, rc, bc, prNum)
 		case commands.CommandCleanup:
@@ -722,11 +722,24 @@ func executeApprove(ctx context.Context, client *github.Client, rc *RuntimeConfi
 // executeMerge executes the merge command with specified method and returns feedback
 //
 //nolint:unparam // error return kept for consistent function signature
-func executeMerge(ctx context.Context, client *github.Client, rc *RuntimeConfig, bc *config.Config, prNum int, method github.MergeMethod) (*feedback.Feedback, error) {
+func executeMerge(
+	ctx context.Context,
+	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
+	prNum, commentID int,
+	method github.MergeMethod,
+	waitForCI bool,
+) (*feedback.Feedback, error) {
 	// Get PR info to check if it's mergeable and get base branch
 	info, err := client.GetPRInfo(ctx, rc.RepoOwner, rc.RepoName, prNum)
 	if err != nil {
 		return feedback.NewMergeFailed(err.Error()), nil
+	}
+
+	// Handle "after CI" modifier - defer merge until CI passes
+	if waitForCI {
+		return executePendingCIMerge(ctx, client, rc, bc, prNum, commentID, method, info)
 	}
 
 	// Check if PR is mergeable
@@ -844,6 +857,178 @@ func enableAutoMerge(
 	return feedback.NewAutoMergeEnabled(rc.CommentAuthor, bc.QuietSuccess), nil
 }
 
+// executePendingCIMerge handles the "merge after CI" flow
+//
+// When CI is already passing, merges immediately. Otherwise:
+// 1. Approves the PR (if not already approved)
+// 2. Adds hourglass reaction to indicate waiting state
+// 3. Adds pending-ci label to track state for poll workflow
+// 4. Returns pending feedback
+//
+//nolint:unparam // error return kept for consistent function signature
+func executePendingCIMerge(
+	ctx context.Context,
+	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
+	prNum, commentID int,
+	method github.MergeMethod,
+	info *github.PRInfo,
+) (*feedback.Feedback, error) {
+	// Get PR head SHA for CI status check
+	headRef, err := client.GetPRHeadRef(ctx, rc.RepoOwner, rc.RepoName, prNum)
+	if err != nil {
+		return feedback.NewMergeFailed("failed to get PR head ref: " + err.Error()), nil
+	}
+
+	// Check current CI status
+	checkStatus, err := client.GetCheckStatus(ctx, rc.RepoOwner, rc.RepoName, headRef)
+	if err != nil {
+		return feedback.NewMergeFailed("failed to get CI status: " + err.Error()), nil
+	}
+
+	// If CI is already passing, merge immediately (fallback to regular merge flow)
+	if checkStatus.AllPassing {
+		return executeImmediateMerge(ctx, client, rc, bc, prNum, method, info)
+	}
+
+	// If CI is failing, don't wait - return error immediately
+	if checkStatus.Failing {
+		return feedback.NewPendingCIFailed(checkStatus.Summary), nil
+	}
+
+	// CI is pending - approve the PR and set up waiting state
+
+	// Prevent self-approval unless explicitly allowed
+	if !bc.AllowSelfApproval && info.Author == rc.CommentAuthor {
+		return feedback.NewUnauthorized(
+			rc.CommentAuthor,
+			[]string{"(self-approval not allowed)"},
+		), nil
+	}
+
+	// Check if bot already approved the PR
+	botAlreadyApproved := isBotAlreadyApproved(info, rc.BotUsername)
+
+	// Check if user already approved the PR
+	userAlreadyApproved := false
+	for _, approver := range info.ApprovedBy {
+		if approver == rc.CommentAuthor {
+			userAlreadyApproved = true
+
+			break
+		}
+	}
+
+	// Approve the PR if neither bot nor user has already approved
+	if !botAlreadyApproved && !userAlreadyApproved {
+		if err := client.ApprovePR(ctx, rc.RepoOwner, rc.RepoName, prNum); err != nil {
+			return feedback.NewApprovalFailed(err.Error()), nil
+		}
+	}
+
+	// Add hourglass reaction to indicate waiting state
+	_ = client.AddReaction(
+		ctx,
+		rc.RepoOwner,
+		rc.RepoName,
+		commentID,
+		github.ReactionPendingCI,
+	)
+
+	// Add pending-ci label with merge method
+	label := getPendingCILabel(method)
+	_ = client.AddLabel(ctx, rc.RepoOwner, rc.RepoName, prNum, label)
+
+	// Return pending feedback
+	methodName := getMergeMethodName(method)
+
+	return feedback.NewPendingCI(rc.CommentAuthor, methodName), nil
+}
+
+// executeImmediateMerge performs the actual merge when CI has already passed
+//
+//nolint:unparam // error return kept for consistent function signature
+func executeImmediateMerge(
+	ctx context.Context,
+	client *github.Client,
+	rc *RuntimeConfig,
+	bc *config.Config,
+	prNum int,
+	method github.MergeMethod,
+	info *github.PRInfo,
+) (*feedback.Feedback, error) {
+	// Prevent self-approval unless explicitly allowed
+	if !bc.AllowSelfApproval && info.Author == rc.CommentAuthor {
+		return feedback.NewUnauthorized(
+			rc.CommentAuthor,
+			[]string{"(self-approval not allowed)"},
+		), nil
+	}
+
+	// Check if bot already approved the PR
+	botAlreadyApproved := isBotAlreadyApproved(info, rc.BotUsername)
+
+	// Check if user already approved the PR
+	userAlreadyApproved := false
+	for _, approver := range info.ApprovedBy {
+		if approver == rc.CommentAuthor {
+			userAlreadyApproved = true
+
+			break
+		}
+	}
+
+	// Approve the PR if neither bot nor user has already approved
+	if !botAlreadyApproved && !userAlreadyApproved {
+		if err := client.ApprovePR(ctx, rc.RepoOwner, rc.RepoName, prNum); err != nil {
+			return feedback.NewApprovalFailed(err.Error()), nil
+		}
+	}
+
+	// Merge the PR
+	if err := client.MergePR(ctx, rc.RepoOwner, rc.RepoName, prNum, method); err != nil {
+		// Try fallback methods if merge commits not allowed
+		if method == github.MergeMethodMerge && strings.Contains(err.Error(), "Merge commits are not allowed") {
+			if err := client.MergePR(ctx, rc.RepoOwner, rc.RepoName, prNum, github.MergeMethodSquash); err != nil {
+				if err := client.MergePR(ctx, rc.RepoOwner, rc.RepoName, prNum, github.MergeMethodRebase); err != nil {
+					return feedback.NewMergeFailed(err.Error()), nil
+				}
+			}
+
+			return feedback.NewMergeSuccess(rc.CommentAuthor, bc.QuietSuccess), nil
+		}
+
+		return feedback.NewMergeFailed(err.Error()), nil
+	}
+
+	return feedback.NewMergeSuccess(rc.CommentAuthor, bc.QuietSuccess), nil
+}
+
+// getPendingCILabel returns the appropriate pending-ci label for the merge method
+func getPendingCILabel(method github.MergeMethod) string {
+	switch method {
+	case github.MergeMethodSquash:
+		return github.LabelPendingCISquash
+	case github.MergeMethodRebase:
+		return github.LabelPendingCIRebase
+	default:
+		return github.LabelPendingCIMerge
+	}
+}
+
+// getMergeMethodName returns a human-readable name for the merge method
+func getMergeMethodName(method github.MergeMethod) string {
+	switch method {
+	case github.MergeMethodSquash:
+		return "squash"
+	case github.MergeMethodRebase:
+		return "rebase"
+	default:
+		return "merge"
+	}
+}
+
 // executeUnapprove executes the unapprove command and returns feedback
 //
 //nolint:unparam // error return kept for consistent function signature
@@ -949,6 +1134,8 @@ func postCombinedFeedback(ctx context.Context, client *github.Client, rc *Runtim
 		reaction = github.ReactionError
 	case feedback.Warning:
 		reaction = github.ReactionWarning
+	case feedback.Pending:
+		reaction = github.ReactionPendingCI
 	default:
 		reaction = github.ReactionSuccess
 	}
