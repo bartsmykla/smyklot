@@ -513,7 +513,15 @@ func NewHelp() *Feedback {
 		"- `/approve` or `@smyklot approve` or `approve` - Approve the PR\n" +
 		"- `accept` or `lgtm` - Alternative ways to approve\n\n" +
 		"**Merge Commands:**\n" +
-		"- `/merge` or `@smyklot merge` or `merge` - Merge the PR\n\n" +
+		"- `/merge` or `@smyklot merge` or `merge` - Merge the PR\n" +
+		"- `/squash` - Squash and merge the PR\n" +
+		"- `/rebase` - Rebase and merge the PR\n\n" +
+		"**Merge After CI:**\n" +
+		"Add `after CI` to defer merge until checks pass:\n" +
+		"- `/merge after CI` - Merge after CI passes\n" +
+		"- `/squash when green` - Squash after checks are green\n" +
+		"- `/rebase once CI passes` - Rebase after CI passes\n" +
+		"The bot will add ⏳ reaction and merge automatically when CI succeeds.\n\n" +
 		"**Review Management:**\n" +
 		"- `/unapprove` or `@smyklot unapprove` or `unapprove` - Dismiss your approval\n" +
 		"- `disapprove` - Alternative way to unapprove\n\n" +
