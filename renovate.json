@@ -4,6 +4,7 @@
     "config:best-practices",
     ":gitSignOff",
     ":label(dependencies)",
-    ":enableVulnerabilityAlerts"
+    ":enableVulnerabilityAlerts",
+    ":prConcurrentLimit20"
   ]
 }
