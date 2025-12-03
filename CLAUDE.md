@@ -365,10 +365,9 @@ task = "3.42.0"                            # Task runner
 
 ## Git Workflow
 
-- **Branching**: Push directly to `main` (no feature branches for this repo)
 - **Commits**: Conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`)
 - **Commit flags**: Always use `-sS` (sign-off + GPG sign)
-- **PR workflow**: Follow global `CLAUDE.md` guidelines
+- **Branching and PRs**: Follow global `CLAUDE.md` guidelines
 
 ## Releases
 
