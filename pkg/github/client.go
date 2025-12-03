@@ -817,6 +817,105 @@ func (c *Client) IsMergeQueueEnabled(ctx context.Context, owner, repo, branch st
 	return false, nil
 }
 
+// GetCheckStatus retrieves the CI check status for a commit
+//
+// Returns a CheckStatus struct indicating whether all checks pass, are pending, or failing.
+// Uses the GitHub REST API: GET /repos/{owner}/{repo}/commits/{ref}/check-runs
+func (c *Client) GetCheckStatus(
+	ctx context.Context,
+	owner, repo, ref string,
+) (*CheckStatus, error) {
+	path := fmt.Sprintf("/repos/%s/%s/commits/%s/check-runs", owner, repo, ref)
+
+	data, err := c.makeRequestWithRetry(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		TotalCount int `json:"total_count"`
+		CheckRuns  []struct {
+			Status     string `json:"status"`
+			Conclusion string `json:"conclusion"`
+		} `json:"check_runs"`
+	}
+
+	if err := json.Unmarshal(data, &response); err != nil {
+		return nil, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	status := &CheckStatus{
+		Total: response.TotalCount,
+	}
+
+	for _, run := range response.CheckRuns {
+		switch run.Status {
+		case "completed":
+			switch run.Conclusion {
+			case "success", "skipped", "neutral":
+				status.Passed++
+			case "failure", "cancelled", "timed_out", "action_required":
+				status.Failed++
+			}
+		case "queued", "in_progress", "pending", "waiting":
+			status.InProgress++
+		}
+	}
+
+	status.AllPassing = status.Total > 0 && status.Failed == 0 && status.InProgress == 0
+	status.Pending = status.InProgress > 0
+	status.Failing = status.Failed > 0
+
+	status.Summary = fmt.Sprintf("%d/%d checks passing", status.Passed, status.Total)
+	if status.InProgress > 0 {
+		status.Summary += fmt.Sprintf(", %d in progress", status.InProgress)
+	}
+
+	if status.Failed > 0 {
+		status.Summary += fmt.Sprintf(", %d failed", status.Failed)
+	}
+
+	return status, nil
+}
+
+// GetPRHeadRef retrieves the head commit SHA of a pull request
+//
+// Returns the SHA of the latest commit on the PR's head branch.
+func (c *Client) GetPRHeadRef(
+	ctx context.Context,
+	owner, repo string,
+	prNumber int,
+) (string, error) {
+	path := fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, repo, prNumber)
+
+	data, err := c.makeRequestWithRetry(ctx, "GET", path, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var response struct {
+		Head struct {
+			SHA string `json:"sha"`
+		} `json:"head"`
+	}
+
+	if err := json.Unmarshal(data, &response); err != nil {
+		return "", NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	if response.Head.SHA == "" {
+		return "", NewAPIError(
+			ErrResponseParse,
+			0,
+			"GET",
+			path,
+			fmt.Errorf("no head SHA in response"),
+		)
+	}
+
+	return response.Head.SHA, nil
+}
+
 // makeRequestWithRetry makes an HTTP request with retry logic and exponential backoff
 func (c *Client) makeRequestWithRetry(
 	ctx context.Context,

@@ -109,3 +109,30 @@ const (
 	// MergeMethodRebase rebases and merges
 	MergeMethodRebase MergeMethod = "rebase"
 )
+
+// CheckStatus represents the status of CI checks on a commit
+type CheckStatus struct {
+	// AllPassing indicates all checks have completed successfully
+	AllPassing bool
+
+	// Pending indicates at least one check is still running
+	Pending bool
+
+	// Failing indicates at least one check has failed
+	Failing bool
+
+	// Summary provides a human-readable status (e.g., "5/6 checks passing")
+	Summary string
+
+	// Total is the total number of check runs
+	Total int
+
+	// Passed is the number of successful check runs
+	Passed int
+
+	// Failed is the number of failed check runs
+	Failed int
+
+	// InProgress is the number of check runs still running
+	InProgress int
+}
