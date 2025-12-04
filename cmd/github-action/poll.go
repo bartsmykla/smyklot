@@ -10,10 +10,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/bartsmykla/smyklot/pkg/config"
-	"github.com/bartsmykla/smyklot/pkg/feedback"
-	"github.com/bartsmykla/smyklot/pkg/github"
-	"github.com/bartsmykla/smyklot/pkg/permissions"
+	"github.com/smykla-labs/smyklot/pkg/config"
+	"github.com/smykla-labs/smyklot/pkg/feedback"
+	"github.com/smykla-labs/smyklot/pkg/github"
+	"github.com/smykla-labs/smyklot/pkg/permissions"
 )
 
 const (

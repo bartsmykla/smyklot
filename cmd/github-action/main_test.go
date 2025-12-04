@@ -4,7 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/bartsmykla/smyklot/pkg/github"
+	"github.com/smykla-labs/smyklot/pkg/github"
 )
 
 var _ = Describe("Main Pending CI Functions [Unit]", func() {

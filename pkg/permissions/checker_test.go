@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/bartsmykla/smyklot/pkg/permissions"
+	"github.com/smykla-labs/smyklot/pkg/permissions"
 )
 
 // mockGitHubClient is a mock implementation of GitHubClient for testing

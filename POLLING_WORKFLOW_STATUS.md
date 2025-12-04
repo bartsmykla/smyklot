@@ -24,7 +24,7 @@
 
 **Deployed to**:
 
-- smyklot repository (bartsmykla/smyklot)
+- smyklot repository (smykla-labs/smyklot)
 - .dotfiles repository (smykla-labs/.dotfiles) - PR #35
 
 ### 2. Auto-Merge Support (v1.4.0)
@@ -72,7 +72,7 @@
 
 **Implementation**:
 
-- Updated `poll-reactions` workflow to use `ghcr.io/bartsmykla/smyklot:1.4.0`
+- Updated `poll-reactions` workflow to use `ghcr.io/smykla-labs/smyklot:1.4.0`
 - Updated `pr-commands` workflow to use Docker image
 - Removed mise installation, Go caching, and build steps
 - Simplified workflows from 6 steps to 2-3 steps
@@ -92,7 +92,7 @@
 
 **Deployed to**:
 
-- smyklot repository (bartsmykla/smyklot)
+- smyklot repository (smykla-labs/smyklot)
 - .dotfiles repository (smykla-labs/.dotfiles) - PR #38
 
 ### 4. PR Reaction Scope Fix (v1.7.6)

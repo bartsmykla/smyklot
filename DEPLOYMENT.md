@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Run Smyklot
-        uses: bartsmykla/smyklot@v0.1.0
+        uses: smykla-labs/smyklot@v0.1.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           comment-body: ${{ github.event.comment.body }}
@@ -85,7 +85,7 @@ Using environment variables:
 
 ```yaml
       - name: Run Smyklot
-        uses: bartsmykla/smyklot@v0.1.0
+        uses: smykla-labs/smyklot@v0.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMENT_BODY: ${{ github.event.comment.body }}
@@ -136,7 +136,7 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Run Smyklot
-        uses: bartsmykla/smyklot@v0.1.0
+        uses: smykla-labs/smyklot@v0.1.0
         with:
           token: ${{ steps.generate-token.outputs.token }}
           comment-body: ${{ github.event.comment.body }}
@@ -151,7 +151,7 @@ Using environment variables:
 
 ```yaml
       - name: Run Smyklot
-        uses: bartsmykla/smyklot@v0.1.0
+        uses: smykla-labs/smyklot@v0.1.0
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
           COMMENT_BODY: ${{ github.event.comment.body }}
@@ -318,7 +318,7 @@ To update to a new version:
 1. Change the version reference in workflow:
 
    ```yaml
-   uses: bartsmykla/smyklot@v1.0.0  # Update this line
+   uses: smykla-labs/smyklot@v1.0.0  # Update this line
    ```
 
 2. Commit and push:
@@ -331,6 +331,6 @@ To update to a new version:
 
 ## Support
 
-- **Issues**: <https://github.com/bartsmykla/smyklot/issues>
-- **Discussions**: <https://github.com/bartsmykla/smyklot/discussions>
-- **Documentation**: <https://github.com/bartsmykla/smyklot/blob/main/README.md>
+- **Issues**: <https://github.com/smykla-labs/smyklot/issues>
+- **Discussions**: <https://github.com/smykla-labs/smyklot/discussions>
+- **Documentation**: <https://github.com/smykla-labs/smyklot/blob/main/README.md>

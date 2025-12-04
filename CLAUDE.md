@@ -378,7 +378,7 @@ task = "3.42.0"                            # Task runner
   - `feat:` → minor bump (0.X.0)
   - `fix:` → patch bump (0.0.X)
   - `feat!:` or `BREAKING CHANGE` → major bump (X.0.0)
-- **Artifacts**: Docker image (`ghcr.io/bartsmykla/smyklot:X.Y.Z`), binaries
+- **Artifacts**: Docker image (`ghcr.io/smykla-labs/smyklot:X.Y.Z`), binaries
 - **Manual trigger**: `gh workflow run auto-release.yaml`
 - **Version files**: `action.yml` (Docker image tag), Git tags (source of truth)
 
