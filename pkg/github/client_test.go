@@ -502,7 +502,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123")
+				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123", nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status).NotTo(BeNil())
 				Expect(status.AllPassing).To(BeTrue())
@@ -532,7 +532,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123")
+				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123", nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status.AllPassing).To(BeFalse())
 				Expect(status.Pending).To(BeTrue())
@@ -560,7 +560,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123")
+				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123", nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status.AllPassing).To(BeFalse())
 				Expect(status.Pending).To(BeFalse())
@@ -584,7 +584,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123")
+				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123", nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status.AllPassing).To(BeFalse())
 				Expect(status.Pending).To(BeFalse())
@@ -603,7 +603,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				_, err = client.GetCheckStatus(context.Background(), "owner", "repo", "invalid-ref")
+				_, err = client.GetCheckStatus(context.Background(), "owner", "repo", "invalid-ref", nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("404"))
 			})
@@ -629,7 +629,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123")
+				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123", nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status.Passed).To(Equal(3))
 				Expect(status.Failed).To(Equal(4))
@@ -654,7 +654,7 @@ var _ = Describe("GitHub Client [Unit]", func() {
 				client, err := github.NewClient("test-token", server.URL)
 				Expect(err).NotTo(HaveOccurred())
 
-				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123")
+				status, err := client.GetCheckStatus(context.Background(), "owner", "repo", "abc123", nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status.InProgress).To(Equal(4))
 				Expect(status.Passed).To(Equal(1))

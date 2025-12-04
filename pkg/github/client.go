@@ -817,13 +817,55 @@ func (c *Client) IsMergeQueueEnabled(ctx context.Context, owner, repo, branch st
 	return false, nil
 }
 
+// GetRequiredStatusChecks retrieves the list of required status check names from branch protection
+//
+// Returns empty slice if branch protection is not enabled or no required checks configured.
+func (c *Client) GetRequiredStatusChecks(ctx context.Context, owner, repo, branch string) ([]string, error) {
+	path := fmt.Sprintf("/repos/%s/%s/branches/%s/protection/required_status_checks", owner, repo, branch)
+
+	data, err := c.makeRequest(ctx, "GET", path, nil)
+	if err != nil {
+		// 404 means branch protection not enabled or no required status checks
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
+			return []string{}, nil
+		}
+
+		return nil, err
+	}
+
+	var response struct {
+		Contexts []string `json:"contexts"` // Legacy required checks
+		Checks   []struct {
+			Context string `json:"context"` // New required checks format
+		} `json:"checks"`
+	}
+
+	if err := json.Unmarshal(data, &response); err != nil {
+		return nil, NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	// Combine both legacy contexts and new checks format
+	required := make([]string, 0, len(response.Contexts)+len(response.Checks))
+	required = append(required, response.Contexts...)
+
+	for _, check := range response.Checks {
+		required = append(required, check.Context)
+	}
+
+	return required, nil
+}
+
 // GetCheckStatus retrieves the CI check status for a commit
 //
 // Returns a CheckStatus struct indicating whether all checks pass, are pending, or failing.
 // Uses the GitHub REST API: GET /repos/{owner}/{repo}/commits/{ref}/check-runs
+//
+// If requiredOnly is specified (non-empty slice), only checks matching those names are considered.
 func (c *Client) GetCheckStatus(
 	ctx context.Context,
 	owner, repo, ref string,
+	requiredOnly []string,
 ) (*CheckStatus, error) {
 	path := fmt.Sprintf("/repos/%s/%s/commits/%s/check-runs", owner, repo, ref)
 
@@ -835,6 +877,7 @@ func (c *Client) GetCheckStatus(
 	var response struct {
 		TotalCount int `json:"total_count"`
 		CheckRuns  []struct {
+			Name       string `json:"name"`
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
 		} `json:"check_runs"`
@@ -844,11 +887,32 @@ func (c *Client) GetCheckStatus(
 		return nil, NewAPIError(ErrResponseParse, 0, "GET", path, err)
 	}
 
+	// Build map for quick required check lookup
+	requiredMap := make(map[string]bool)
+	for _, name := range requiredOnly {
+		requiredMap[name] = true
+	}
+
 	status := &CheckStatus{
 		Total: response.TotalCount,
 	}
 
+	// If filtering by required checks only, reset total to count only required
+	if len(requiredOnly) > 0 {
+		status.Total = 0
+	}
+
 	for _, run := range response.CheckRuns {
+		// If filtering by required checks, skip non-required checks
+		if len(requiredOnly) > 0 && !requiredMap[run.Name] {
+			continue
+		}
+
+		// Count this check toward the total if filtering
+		if len(requiredOnly) > 0 {
+			status.Total++
+		}
+
 		switch run.Status {
 		case "completed":
 			switch run.Conclusion {
