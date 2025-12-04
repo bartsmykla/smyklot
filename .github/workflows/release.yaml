@@ -15,8 +15,26 @@ on:
 permissions: {}
 
 jobs:
+  # Check if workflow should proceed
+  check:
+    name: Check Conditions
+    runs-on: ubuntu-24.04
+    if: |
+      (github.event_name == 'schedule') ||
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true &&
+       (contains(github.event.pull_request.labels.*.name, 'release') ||
+        contains(github.event.pull_request.labels.*.name, 'release/major') ||
+        contains(github.event.pull_request.labels.*.name, 'release/minor') ||
+        contains(github.event.pull_request.labels.*.name, 'release/patch')))
+    steps:
+      - name: Conditions met
+        run: echo "Workflow conditions met, proceeding with release process"
+
   # Run tests first
   test:
+    needs: check
     name: Test
     runs-on: ubuntu-24.04
     permissions:
@@ -51,15 +69,6 @@ jobs:
     name: Semantic Release
     runs-on: ubuntu-24.04
     needs: test
-    if: |
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'workflow_dispatch') ||
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.merged == true &&
-       (contains(github.event.pull_request.labels.*.name, 'release') ||
-        contains(github.event.pull_request.labels.*.name, 'release/major') ||
-        contains(github.event.pull_request.labels.*.name, 'release/minor') ||
-        contains(github.event.pull_request.labels.*.name, 'release/patch')))
     permissions:
       contents: write
       issues: write
