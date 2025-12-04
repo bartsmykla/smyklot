@@ -147,3 +147,32 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Notify organization repositories of new release
+  notify-org:
+    name: Notify Org
+    runs-on: ubuntu-24.04
+    needs: [release, goreleaser]
+    if: needs.goreleaser.result == 'success'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
+        with:
+          app-id: ${{ vars.SMYKLOT_APP_ID }}
+          private-key: ${{ secrets.SMYKLOT_APP_PRIVATE_KEY }}
+          owner: smykla-labs
+          repositories: .github
+
+      - name: Trigger smyklot sync
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.release.outputs.new_release_version }}
+          TAG: ${{ needs.release.outputs.new_release_git_tag }}
+        run: |
+          gh api repos/smykla-labs/.github/dispatches \
+            -f event_type="smyklot-release" \
+            -f "client_payload=$(jq -n --arg version "$VERSION" --arg tag "$TAG" '{version: $version, tag: $tag}')"
