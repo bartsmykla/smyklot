@@ -75,8 +75,8 @@ const (
 	// ReactionCleanup represents cleanup command (❤️)
 	ReactionCleanup ReactionType = "heart"
 
-	// ReactionPendingCI represents waiting for CI (⏳)
-	ReactionPendingCI ReactionType = "hourglass"
+	// ReactionPendingCI represents waiting for CI (👀)
+	ReactionPendingCI ReactionType = "eyes"
 )
 
 // Reaction represents a reaction on a comment
