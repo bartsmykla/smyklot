@@ -220,10 +220,10 @@ Create a test pull request and try the commands:
 
 ### Available Commands
 
-| Command | Alias | Action | Requirements |
-|---------|-------|--------|--------------|
-| `/approve` | `@smyklot approve` | Approve the PR | Listed in CODEOWNERS |
-| `/merge` | `@smyklot merge` | Merge the PR | CODEOWNERS + mergeable |
+| Command    | Alias              | Action         | Requirements           |
+|------------|--------------------|----------------|------------------------|
+| `/approve` | `@smyklot approve` | Approve the PR | Listed in CODEOWNERS   |
+| `/merge`   | `@smyklot merge`   | Merge the PR   | CODEOWNERS + mergeable |
 
 ### Feedback System
 
