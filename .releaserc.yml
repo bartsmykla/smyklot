@@ -53,6 +53,7 @@ plugins:
 
   - - "@semantic-release/changelog"
     - changelogFile: CHANGELOG.md
+      changelogTitle: "# Changelog"
 
   - - "@semantic-release/exec"
     - prepareCmd: perl -i -pe 's|smyklot:[0-9]+\.[0-9]+\.[0-9]+|smyklot:${nextRelease.version}|g' action.yml
