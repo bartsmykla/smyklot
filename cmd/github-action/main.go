@@ -359,11 +359,11 @@ func run(cmd *cobra.Command, _ []string) error {
 		case commands.CommandApprove:
 			fb, err = executeApprove(ctx, client, rc, bc, prNum)
 		case commands.CommandMerge:
-			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodMerge, parsedCmd.WaitForCI)
+			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodMerge, parsedCmd.WaitForCI, parsedCmd.RequiredChecksOnly)
 		case commands.CommandSquash:
-			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodSquash, parsedCmd.WaitForCI)
+			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodSquash, parsedCmd.WaitForCI, parsedCmd.RequiredChecksOnly)
 		case commands.CommandRebase:
-			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodRebase, parsedCmd.WaitForCI)
+			fb, err = executeMerge(ctx, client, rc, bc, prNum, commentIDNum, github.MergeMethodRebase, parsedCmd.WaitForCI, parsedCmd.RequiredChecksOnly)
 		case commands.CommandUnapprove:
 			fb, err = executeUnapprove(ctx, client, rc, bc, prNum)
 		case commands.CommandCleanup:
@@ -730,6 +730,7 @@ func executeMerge(
 	prNum, commentID int,
 	method github.MergeMethod,
 	waitForCI bool,
+	requiredChecksOnly bool,
 ) (*feedback.Feedback, error) {
 	// Get PR info to check if it's mergeable and get base branch
 	info, err := client.GetPRInfo(ctx, rc.RepoOwner, rc.RepoName, prNum)
@@ -739,7 +740,7 @@ func executeMerge(
 
 	// Handle "after CI" modifier - defer merge until CI passes
 	if waitForCI {
-		return executePendingCIMerge(ctx, client, rc, bc, prNum, commentID, method, info)
+		return executePendingCIMerge(ctx, client, rc, bc, prNum, commentID, method, info, requiredChecksOnly)
 	}
 
 	// Check if PR is mergeable
@@ -874,6 +875,7 @@ func executePendingCIMerge(
 	prNum, commentID int,
 	method github.MergeMethod,
 	info *github.PRInfo,
+	requiredChecksOnly bool,
 ) (*feedback.Feedback, error) {
 	// Get PR head SHA for CI status check
 	headRef, err := client.GetPRHeadRef(ctx, rc.RepoOwner, rc.RepoName, prNum)
@@ -881,8 +883,17 @@ func executePendingCIMerge(
 		return feedback.NewMergeFailed("failed to get PR head ref: " + err.Error()), nil
 	}
 
+	// Get required checks list if filtering by required checks only
+	var requiredChecks []string
+	if requiredChecksOnly && info.BaseBranch != "" {
+		requiredChecks, err = client.GetRequiredStatusChecks(ctx, rc.RepoOwner, rc.RepoName, info.BaseBranch)
+		if err != nil {
+			return feedback.NewMergeFailed("failed to get required checks: " + err.Error()), nil
+		}
+	}
+
 	// Check current CI status
-	checkStatus, err := client.GetCheckStatus(ctx, rc.RepoOwner, rc.RepoName, headRef)
+	checkStatus, err := client.GetCheckStatus(ctx, rc.RepoOwner, rc.RepoName, headRef, requiredChecks)
 	if err != nil {
 		return feedback.NewMergeFailed("failed to get CI status: " + err.Error()), nil
 	}
@@ -936,8 +947,8 @@ func executePendingCIMerge(
 		github.ReactionPendingCI,
 	)
 
-	// Add pending-ci label with merge method
-	label := getPendingCILabel(method)
+	// Add pending-ci label with merge method and required flag
+	label := getPendingCILabel(method, requiredChecksOnly)
 	_ = client.AddLabel(ctx, rc.RepoOwner, rc.RepoName, prNum, label)
 
 	// Return pending feedback
@@ -1005,8 +1016,19 @@ func executeImmediateMerge(
 	return feedback.NewMergeSuccess(rc.CommentAuthor, bc.QuietSuccess), nil
 }
 
-// getPendingCILabel returns the appropriate pending-ci label for the merge method
-func getPendingCILabel(method github.MergeMethod) string {
+// getPendingCILabel returns the appropriate pending-ci label for the merge method and required flag
+func getPendingCILabel(method github.MergeMethod, requiredOnly bool) string {
+	if requiredOnly {
+		switch method {
+		case github.MergeMethodSquash:
+			return github.LabelPendingCISquashRequired
+		case github.MergeMethodRebase:
+			return github.LabelPendingCIRebaseRequired
+		default:
+			return github.LabelPendingCIMergeRequired
+		}
+	}
+
 	switch method {
 	case github.MergeMethodSquash:
 		return github.LabelPendingCISquash

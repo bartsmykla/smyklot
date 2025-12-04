@@ -51,4 +51,8 @@ type Command struct {
 	// WaitForCI indicates merge should be deferred until CI passes
 	// Set when "after CI", "when green", "when checks pass" modifier is detected
 	WaitForCI bool
+
+	// RequiredChecksOnly indicates only required checks should be considered
+	// Set when "required" modifier is detected (e.g., "after required CI")
+	RequiredChecksOnly bool
 }

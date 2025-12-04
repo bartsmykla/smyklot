@@ -308,9 +308,10 @@ func processPendingCIPRs(
 
 // pendingCIPR holds data about a PR waiting for CI
 type pendingCIPR struct {
-	prData map[string]interface{}
-	method github.MergeMethod
-	label  string
+	prData       map[string]interface{}
+	method       github.MergeMethod
+	label        string
+	requiredOnly bool // true if only required checks should be considered
 }
 
 // filterPendingCIPRs filters PRs that have pending-ci labels
@@ -334,12 +335,13 @@ func filterPendingCIPRs(prs []map[string]interface{}) []pendingCIPR {
 				continue
 			}
 
-			method, label := parsePendingCILabel(labelName)
+			method, requiredOnly, label := parsePendingCILabel(labelName)
 			if label != "" {
 				result = append(result, pendingCIPR{
-					prData: pr,
-					method: method,
-					label:  label,
+					prData:       pr,
+					method:       method,
+					label:        label,
+					requiredOnly: requiredOnly,
 				})
 
 				break // Only one pending-ci label per PR
@@ -350,21 +352,27 @@ func filterPendingCIPRs(prs []map[string]interface{}) []pendingCIPR {
 	return result
 }
 
-// parsePendingCILabel parses a pending-ci label and returns the merge method
+// parsePendingCILabel parses a pending-ci label and returns the merge method and required flag
 //
 // Returns:
-// - MergeMethod and label name if valid pending-ci label
+// - MergeMethod, requiredOnly bool, and label name if valid pending-ci label
 // - Empty string if not a pending-ci label
-func parsePendingCILabel(label string) (github.MergeMethod, string) {
+func parsePendingCILabel(label string) (github.MergeMethod, bool, string) {
 	switch label {
 	case github.LabelPendingCIMerge:
-		return github.MergeMethodMerge, label
+		return github.MergeMethodMerge, false, label
 	case github.LabelPendingCISquash:
-		return github.MergeMethodSquash, label
+		return github.MergeMethodSquash, false, label
 	case github.LabelPendingCIRebase:
-		return github.MergeMethodRebase, label
+		return github.MergeMethodRebase, false, label
+	case github.LabelPendingCIMergeRequired:
+		return github.MergeMethodMerge, true, label
+	case github.LabelPendingCISquashRequired:
+		return github.MergeMethodSquash, true, label
+	case github.LabelPendingCIRebaseRequired:
+		return github.MergeMethodRebase, true, label
 	default:
-		return "", ""
+		return "", false, ""
 	}
 }
 
@@ -398,8 +406,25 @@ func processPendingCIPR(
 		return fmt.Errorf("failed to get PR head ref: %w", err)
 	}
 
+	// Get required checks list if filtering by required checks only
+	var requiredChecks []string
+	if pr.requiredOnly {
+		// Get base branch from PR info
+		info, err := client.GetPRInfo(ctx, repoOwner, repoName, prNumber)
+		if err != nil {
+			return fmt.Errorf("failed to get PR info: %w", err)
+		}
+
+		if info.BaseBranch != "" {
+			requiredChecks, err = client.GetRequiredStatusChecks(ctx, repoOwner, repoName, info.BaseBranch)
+			if err != nil {
+				return fmt.Errorf("failed to get required checks: %w", err)
+			}
+		}
+	}
+
 	// Check current CI status
-	checkStatus, err := client.GetCheckStatus(ctx, repoOwner, repoName, headRef)
+	checkStatus, err := client.GetCheckStatus(ctx, repoOwner, repoName, headRef, requiredChecks)
 	if err != nil {
 		return fmt.Errorf("failed to get CI status: %w", err)
 	}

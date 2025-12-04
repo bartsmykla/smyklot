@@ -9,24 +9,48 @@ import (
 
 var _ = Describe("Main Pending CI Functions [Unit]", func() {
 	Describe("getPendingCILabel", func() {
-		It("should return merge label for merge method", func() {
-			label := getPendingCILabel(github.MergeMethodMerge)
-			Expect(label).To(Equal(github.LabelPendingCIMerge))
+		Context("with requiredOnly=false", func() {
+			It("should return merge label for merge method", func() {
+				label := getPendingCILabel(github.MergeMethodMerge, false)
+				Expect(label).To(Equal(github.LabelPendingCIMerge))
+			})
+
+			It("should return squash label for squash method", func() {
+				label := getPendingCILabel(github.MergeMethodSquash, false)
+				Expect(label).To(Equal(github.LabelPendingCISquash))
+			})
+
+			It("should return rebase label for rebase method", func() {
+				label := getPendingCILabel(github.MergeMethodRebase, false)
+				Expect(label).To(Equal(github.LabelPendingCIRebase))
+			})
+
+			It("should return merge label for unknown method", func() {
+				label := getPendingCILabel(github.MergeMethod("unknown"), false)
+				Expect(label).To(Equal(github.LabelPendingCIMerge))
+			})
 		})
 
-		It("should return squash label for squash method", func() {
-			label := getPendingCILabel(github.MergeMethodSquash)
-			Expect(label).To(Equal(github.LabelPendingCISquash))
-		})
+		Context("with requiredOnly=true", func() {
+			It("should return required merge label for merge method", func() {
+				label := getPendingCILabel(github.MergeMethodMerge, true)
+				Expect(label).To(Equal(github.LabelPendingCIMergeRequired))
+			})
 
-		It("should return rebase label for rebase method", func() {
-			label := getPendingCILabel(github.MergeMethodRebase)
-			Expect(label).To(Equal(github.LabelPendingCIRebase))
-		})
+			It("should return required squash label for squash method", func() {
+				label := getPendingCILabel(github.MergeMethodSquash, true)
+				Expect(label).To(Equal(github.LabelPendingCISquashRequired))
+			})
 
-		It("should return merge label for unknown method", func() {
-			label := getPendingCILabel(github.MergeMethod("unknown"))
-			Expect(label).To(Equal(github.LabelPendingCIMerge))
+			It("should return required rebase label for rebase method", func() {
+				label := getPendingCILabel(github.MergeMethodRebase, true)
+				Expect(label).To(Equal(github.LabelPendingCIRebaseRequired))
+			})
+
+			It("should return required merge label for unknown method", func() {
+				label := getPendingCILabel(github.MergeMethod("unknown"), true)
+				Expect(label).To(Equal(github.LabelPendingCIMergeRequired))
+			})
 		})
 	})
 

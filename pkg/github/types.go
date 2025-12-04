@@ -106,6 +106,15 @@ const (
 
 	// LabelPendingCIRebase indicates PR is waiting for CI before rebase merge
 	LabelPendingCIRebase = "smyklot:pending-ci:rebase"
+
+	// LabelPendingCIMergeRequired indicates PR is waiting for required CI only before merge
+	LabelPendingCIMergeRequired = "smyklot:pending-ci:required"
+
+	// LabelPendingCISquashRequired indicates PR is waiting for required CI only before squash merge
+	LabelPendingCISquashRequired = "smyklot:pending-ci:squash:required"
+
+	// LabelPendingCIRebaseRequired indicates PR is waiting for required CI only before rebase merge
+	LabelPendingCIRebaseRequired = "smyklot:pending-ci:rebase:required"
 )
 
 // MergeMethod represents the type of merge method to use

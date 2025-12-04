@@ -16,32 +16,58 @@ import (
 var _ = Describe("Poll Pending CI [Unit]", func() {
 	Describe("parsePendingCILabel", func() {
 		It("should parse smyklot:pending-ci label as merge method", func() {
-			method, label := parsePendingCILabel(github.LabelPendingCIMerge)
+			method, requiredOnly, label := parsePendingCILabel(github.LabelPendingCIMerge)
 			Expect(method).To(Equal(github.MergeMethodMerge))
+			Expect(requiredOnly).To(BeFalse())
 			Expect(label).To(Equal(github.LabelPendingCIMerge))
 		})
 
 		It("should parse smyklot:pending-ci:squash label as squash method", func() {
-			method, label := parsePendingCILabel(github.LabelPendingCISquash)
+			method, requiredOnly, label := parsePendingCILabel(github.LabelPendingCISquash)
 			Expect(method).To(Equal(github.MergeMethodSquash))
+			Expect(requiredOnly).To(BeFalse())
 			Expect(label).To(Equal(github.LabelPendingCISquash))
 		})
 
 		It("should parse smyklot:pending-ci:rebase label as rebase method", func() {
-			method, label := parsePendingCILabel(github.LabelPendingCIRebase)
+			method, requiredOnly, label := parsePendingCILabel(github.LabelPendingCIRebase)
 			Expect(method).To(Equal(github.MergeMethodRebase))
+			Expect(requiredOnly).To(BeFalse())
 			Expect(label).To(Equal(github.LabelPendingCIRebase))
 		})
 
+		It("should parse smyklot:pending-ci:required label as required merge method", func() {
+			method, requiredOnly, label := parsePendingCILabel(github.LabelPendingCIMergeRequired)
+			Expect(method).To(Equal(github.MergeMethodMerge))
+			Expect(requiredOnly).To(BeTrue())
+			Expect(label).To(Equal(github.LabelPendingCIMergeRequired))
+		})
+
+		It("should parse smyklot:pending-ci:squash:required label as required squash method", func() {
+			method, requiredOnly, label := parsePendingCILabel(github.LabelPendingCISquashRequired)
+			Expect(method).To(Equal(github.MergeMethodSquash))
+			Expect(requiredOnly).To(BeTrue())
+			Expect(label).To(Equal(github.LabelPendingCISquashRequired))
+		})
+
+		It("should parse smyklot:pending-ci:rebase:required label as required rebase method", func() {
+			method, requiredOnly, label := parsePendingCILabel(github.LabelPendingCIRebaseRequired)
+			Expect(method).To(Equal(github.MergeMethodRebase))
+			Expect(requiredOnly).To(BeTrue())
+			Expect(label).To(Equal(github.LabelPendingCIRebaseRequired))
+		})
+
 		It("should return empty string for non-pending-ci labels", func() {
-			method, label := parsePendingCILabel("some-other-label")
+			method, requiredOnly, label := parsePendingCILabel("some-other-label")
 			Expect(method).To(Equal(github.MergeMethod("")))
+			Expect(requiredOnly).To(BeFalse())
 			Expect(label).To(BeEmpty())
 		})
 
 		It("should return empty string for reaction labels", func() {
-			method, label := parsePendingCILabel(github.LabelReactionApprove)
+			method, requiredOnly, label := parsePendingCILabel(github.LabelReactionApprove)
 			Expect(method).To(Equal(github.MergeMethod("")))
+			Expect(requiredOnly).To(BeFalse())
 			Expect(label).To(BeEmpty())
 		})
 	})

@@ -914,23 +914,38 @@ All changes tested:
 				Expect(cmd.WaitForCI).To(BeTrue())
 			})
 
-			// Bare command variations
-			// Note: Bare commands with "after CI" modifier contain natural language
-			// words like "after", "when", "once" which trigger the natural language
-			// detection filter. This is expected behavior - users should use slash
-			// or mention commands for the modifier syntax.
-			It("should NOT parse 'merge after CI' as bare command due to natural language detection", func() {
+			// Bare command variations with CI modifiers
+			// CI-related terms are now recognized as command context, allowing bare commands
+			It("should parse 'merge after CI' as bare command", func() {
 				cmd, err := commands.ParseCommand("merge after CI", nil)
 				Expect(err).NotTo(HaveOccurred())
-				// "after" is a natural language indicator, so bare command parsing is skipped
-				Expect(cmd.IsValid).To(BeFalse())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.IsValid).To(BeTrue())
 			})
 
-			It("should NOT parse 'squash when green' as bare command due to natural language detection", func() {
+			It("should parse 'squash after CI' as bare command", func() {
+				cmd, err := commands.ParseCommand("squash after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse 'rebase after CI' as bare command", func() {
+				cmd, err := commands.ParseCommand("rebase after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandRebase))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.IsValid).To(BeTrue())
+			})
+
+			It("should parse 'squash when green' as bare command", func() {
 				cmd, err := commands.ParseCommand("squash when green", nil)
 				Expect(err).NotTo(HaveOccurred())
-				// "when" is a natural language indicator, so bare command parsing is skipped
-				Expect(cmd.IsValid).To(BeFalse())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.IsValid).To(BeTrue())
 			})
 
 			// Combined commands
@@ -943,11 +958,14 @@ All changes tested:
 				Expect(cmd.WaitForCI).To(BeTrue())
 			})
 
-			It("should NOT parse 'lgtm merge after CI' as bare command due to natural language detection", func() {
+			It("should parse 'lgtm merge after CI' as bare command with multiple commands", func() {
 				cmd, err := commands.ParseCommand("lgtm merge after CI", nil)
 				Expect(err).NotTo(HaveOccurred())
-				// "after" is a natural language indicator, so bare command parsing is skipped
-				Expect(cmd.IsValid).To(BeFalse())
+				Expect(cmd.Commands).To(HaveLen(2))
+				Expect(cmd.Commands[0]).To(Equal(commands.CommandApprove))
+				Expect(cmd.Commands[1]).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.IsValid).To(BeTrue())
 			})
 
 			// Multiline
@@ -964,6 +982,197 @@ when checks pass`
 				cmd, err := commands.ParseCommand(comment, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+		})
+
+		Context("when parsing extended CI terminology", func() {
+			// CD terminology
+			It("should parse '/merge after CD' with WaitForCI=true", func() {
+				cmd, err := commands.ParseCommand("/merge after CD", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse 'squash after CD' as bare command", func() {
+				cmd, err := commands.ParseCommand("squash after CD", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// GHA terminology
+			It("should parse '/merge after GHA' with WaitForCI=true", func() {
+				cmd, err := commands.ParseCommand("/merge after GHA", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse 'rebase after GHA' as bare command", func() {
+				cmd, err := commands.ParseCommand("rebase after GHA", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandRebase))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// Workflows terminology
+			It("should parse '/merge after workflows' with WaitForCI=true", func() {
+				cmd, err := commands.ParseCommand("/merge after workflows", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse 'squash after workflow' as bare command", func() {
+				cmd, err := commands.ParseCommand("squash after workflow", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// GitHub Actions terminology
+			It("should parse '/merge after github actions' with WaitForCI=true", func() {
+				cmd, err := commands.ParseCommand("/merge after github actions", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse 'merge after github actions' as bare command", func() {
+				cmd, err := commands.ParseCommand("merge after github actions", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			// "finishes" and "completes" variations
+			It("should parse '/merge when CI finishes' with WaitForCI=true", func() {
+				cmd, err := commands.ParseCommand("/merge when CI finishes", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse 'squash when CI completes' as bare command", func() {
+				cmd, err := commands.ParseCommand("squash when CI completes", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+
+			It("should parse 'rebase once workflows finish' as bare command", func() {
+				cmd, err := commands.ParseCommand("rebase once workflows finish", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandRebase))
+				Expect(cmd.WaitForCI).To(BeTrue())
+			})
+		})
+
+		Context("when parsing 'required checks only' modifier", func() {
+			// Slash commands with "required" modifier
+			It("should parse '/merge after required CI' with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("/merge after required CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			It("should parse '/squash after required CI' with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("/squash after required CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			It("should parse '/rebase after required CI' with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("/rebase after required CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandRebase))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			// Bare commands with "required" modifier
+			It("should parse 'squash after required CI' as bare command with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("squash after required CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			It("should parse 'merge after required checks' as bare command with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("merge after required checks", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			It("should parse 'rebase when required CI passes' as bare command with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("rebase when required CI passes", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandRebase))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			// Mention commands with "required" modifier
+			It("should parse '@smyklot merge after required CI' with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("@smyklot merge after required CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			// "required" with extended terminology
+			It("should parse 'squash after required GHA' as bare command with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("squash after required GHA", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandSquash))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			It("should parse 'merge when required workflows finish' as bare command with RequiredChecksOnly=true", func() {
+				cmd, err := commands.ParseCommand("merge when required workflows finish", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.Type).To(Equal(commands.CommandMerge))
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			// Case insensitivity for "required"
+			It("should be case-insensitive for 'REQUIRED'", func() {
+				cmd, err := commands.ParseCommand("/merge after REQUIRED CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			It("should be case-insensitive for 'Required'", func() {
+				cmd, err := commands.ParseCommand("squash after Required checks", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeTrue())
+			})
+
+			// Regular (non-required) CI should NOT set RequiredChecksOnly
+			It("should NOT set RequiredChecksOnly for regular '/merge after CI'", func() {
+				cmd, err := commands.ParseCommand("/merge after CI", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeFalse())
+			})
+
+			It("should NOT set RequiredChecksOnly for regular 'squash when green'", func() {
+				cmd, err := commands.ParseCommand("squash when green", nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmd.WaitForCI).To(BeTrue())
+				Expect(cmd.RequiredChecksOnly).To(BeFalse())
 			})
 		})
 
