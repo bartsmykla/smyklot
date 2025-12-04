@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.1](https://github.com/smykla-labs/smyklot/compare/v1.9.0...v1.9.1) (2025-12-04)
+
+### Code Refactoring
+
+* **repo:** migrate to smykla-labs org ([#27](https://github.com/smykla-labs/smyklot/issues/27)) ([1e22f09](https://github.com/smykla-labs/smyklot/commit/1e22f09a0ba524019d8cbe64ea126f9a21e5c804))
+
 ## [1.9.0](https://github.com/bartsmykla/smyklot/compare/v1.8.0...v1.9.0) (2025-12-04)
 
 ### Features
