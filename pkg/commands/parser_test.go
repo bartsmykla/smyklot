@@ -4,8 +4,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/bartsmykla/smyklot/pkg/commands"
-	"github.com/bartsmykla/smyklot/pkg/config"
+	"github.com/smykla-labs/smyklot/pkg/commands"
+	"github.com/smykla-labs/smyklot/pkg/config"
 )
 
 var _ = Describe("Command Parser [Unit]", func() {

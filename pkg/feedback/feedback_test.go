@@ -4,7 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/bartsmykla/smyklot/pkg/feedback"
+	"github.com/smykla-labs/smyklot/pkg/feedback"
 )
 
 var _ = Describe("Feedback System [Unit]", func() {

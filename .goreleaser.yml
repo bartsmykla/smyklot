@@ -37,7 +37,7 @@ dockers_v2:
   - ids:
       - smyklot
     images:
-      - ghcr.io/bartsmykla/smyklot
+      - ghcr.io/smykla-labs/smyklot
     tags:
       - "{{ trimprefix .Tag \"v\" }}"
       - "{{ .Major }}"
@@ -54,7 +54,7 @@ dockers_v2:
     labels:
       org.opencontainers.image.title: "{{.ProjectName}}"
       org.opencontainers.image.description: "Automated PR approvals and merges based on CODEOWNERS"
-      org.opencontainers.image.url: "https://github.com/bartsmykla/smyklot"
+      org.opencontainers.image.url: "https://github.com/smykla-labs/smyklot"
       org.opencontainers.image.source: "{{ trimsuffix .GitURL \".git\" }}"
       org.opencontainers.image.version: "{{.Version}}"
       org.opencontainers.image.created: "{{.Date}}"
@@ -74,4 +74,4 @@ release:
   header: |
     ## Smyklot {{.Tag}}
 
-    Docker image: `ghcr.io/bartsmykla/smyklot:{{ trimprefix .Tag "v" }}`
+    Docker image: `ghcr.io/smykla-labs/smyklot:{{ trimprefix .Tag "v" }}`
