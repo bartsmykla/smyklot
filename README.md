@@ -57,15 +57,15 @@ cp .github/workflows/pr-commands.yaml your-repo/.github/workflows/
 
 Smyklot responds to these commands in PR comments:
 
-| Command | Aliases | Format | Description |
-|---------|---------|--------|-------------|
-| `approve` | `lgtm`, `accept` | `/approve`, `@smyklot approve`, `approve` | Approve the pull request |
-| `merge` | - | `/merge`, `@smyklot merge`, `merge` | Merge the pull request (with fallback) |
-| `squash` | - | `/squash`, `@smyklot squash`, `squash` | Squash merge the pull request |
-| `rebase` | - | `/rebase`, `@smyklot rebase`, `rebase` | Rebase merge the pull request |
-| `unapprove` | - | `/unapprove`, `@smyklot unapprove` | Remove approval |
-| `cleanup` | - | `/cleanup`, `@smyklot cleanup`, `cleanup` | Remove all bot reactions, approvals, and comments |
-| `help` | - | `/help`, `@smyklot help` | Show help information |
+| Command     | Aliases          | Format                                    | Description                                       |
+|-------------|------------------|-------------------------------------------|---------------------------------------------------|
+| `approve`   | `lgtm`, `accept` | `/approve`, `@smyklot approve`, `approve` | Approve the pull request                          |
+| `merge`     | -                | `/merge`, `@smyklot merge`, `merge`       | Merge the pull request (with fallback)            |
+| `squash`    | -                | `/squash`, `@smyklot squash`, `squash`    | Squash merge the pull request                     |
+| `rebase`    | -                | `/rebase`, `@smyklot rebase`, `rebase`    | Rebase merge the pull request                     |
+| `unapprove` | -                | `/unapprove`, `@smyklot unapprove`        | Remove approval                                   |
+| `cleanup`   | -                | `/cleanup`, `@smyklot cleanup`, `cleanup` | Remove all bot reactions, approvals, and comments |
+| `help`      | -                | `/help`, `@smyklot help`                  | Show help information                             |
 
 **Command Formats**:
 
@@ -77,11 +77,11 @@ All commands are case-insensitive.
 
 ### Reaction Commands
 
-| Reaction | Action |
-|----------|--------|
-| 👍 | Approve the pull request |
-| 🚀 | Merge the pull request |
-| ❤️ | Cleanup (remove all bot reactions, approvals, and comments) |
+| Reaction | Action                                                      |
+|----------|-------------------------------------------------------------|
+| 👍       | Approve the pull request                                    |
+| 🚀       | Merge the pull request                                      |
+| ❤️       | Cleanup (remove all bot reactions, approvals, and comments) |
 
 **Note**: Reactions must be added to the PR description, not to comments. Removing a reaction will automatically undo the corresponding action (remove approval/merge labels).
 
@@ -210,20 +210,20 @@ Set a `SMYKLOT_CONFIG` repository variable with your complete configuration:
 
 Configure individual settings via repository variables or environment variables with `SMYKLOT_` prefix:
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `SMYKLOT_QUIET_SUCCESS` | boolean | `false` | Disable success feedback comments |
-| `SMYKLOT_QUIET_REACTIONS` | boolean | `false` | Disable reaction-based approval/merge comments |
-| `SMYKLOT_ALLOWED_COMMANDS` | list | all | Limit which commands are allowed |
-| `SMYKLOT_COMMAND_ALIASES` | map | default | Define custom command aliases |
-| `SMYKLOT_COMMAND_PREFIX` | string | `/` | Custom command prefix |
-| `SMYKLOT_DISABLE_MENTIONS` | boolean | `false` | Disable mention commands |
-| `SMYKLOT_DISABLE_BARE_COMMANDS` | boolean | `false` | Disable bare commands |
-| `SMYKLOT_DISABLE_UNAPPROVE` | boolean | `false` | Disable unapprove command |
-| `SMYKLOT_DISABLE_REACTIONS` | boolean | `false` | Disable reaction-based approvals/merges |
-| `SMYKLOT_DISABLE_DELETED_COMMENTS` | boolean | `false` | Disable handling of deleted comments |
-| `SMYKLOT_ALLOW_SELF_APPROVAL` | boolean | `false` | Allow PR authors to approve their own PRs |
-| `SMYKLOT_BOT_USERNAME` | string | `smyklot[bot]` | Bot username for cleanup operations (GitHub App format: `{app-slug}[bot]`) |
+| Variable                           | Type    | Default        | Description                                                                |
+|------------------------------------|---------|----------------|----------------------------------------------------------------------------|
+| `SMYKLOT_QUIET_SUCCESS`            | boolean | `false`        | Disable success feedback comments                                          |
+| `SMYKLOT_QUIET_REACTIONS`          | boolean | `false`        | Disable reaction-based approval/merge comments                             |
+| `SMYKLOT_ALLOWED_COMMANDS`         | list    | all            | Limit which commands are allowed                                           |
+| `SMYKLOT_COMMAND_ALIASES`          | map     | default        | Define custom command aliases                                              |
+| `SMYKLOT_COMMAND_PREFIX`           | string  | `/`            | Custom command prefix                                                      |
+| `SMYKLOT_DISABLE_MENTIONS`         | boolean | `false`        | Disable mention commands                                                   |
+| `SMYKLOT_DISABLE_BARE_COMMANDS`    | boolean | `false`        | Disable bare commands                                                      |
+| `SMYKLOT_DISABLE_UNAPPROVE`        | boolean | `false`        | Disable unapprove command                                                  |
+| `SMYKLOT_DISABLE_REACTIONS`        | boolean | `false`        | Disable reaction-based approvals/merges                                    |
+| `SMYKLOT_DISABLE_DELETED_COMMENTS` | boolean | `false`        | Disable handling of deleted comments                                       |
+| `SMYKLOT_ALLOW_SELF_APPROVAL`      | boolean | `false`        | Allow PR authors to approve their own PRs                                  |
+| `SMYKLOT_BOT_USERNAME`             | string  | `smyklot[bot]` | Bot username for cleanup operations (GitHub App format: `{app-slug}[bot]`) |
 
 #### Configuration Examples
 
@@ -375,8 +375,6 @@ Smyklot implements defense-in-depth security practices:
 - Go dependencies verified (`go mod verify`)
 - Docker images use minimal base (`FROM scratch`)
 
-For detailed security information, see our [Security Policy](SECURITY.md).
-
 ## Development
 
 ### Requirements
@@ -498,8 +496,6 @@ Current test coverage: 130+ tests passing
 - [ ] Required approvals count
 
 ### Phase 3: Kubernetes Deployment (Future)
-
-See [PHASE3_PLAN.md](PHASE3_PLAN.md) for detailed implementation plan.
 
 **Prerequisites** (Security Hardening):
 
