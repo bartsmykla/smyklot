@@ -389,7 +389,7 @@ For detailed security information, see our [Security Policy](SECURITY.md).
 
 ```bash
 # Clone repository
-git clone https://github.com/bartsmykla/smyklot.git
+git clone https://github.com/smykla-labs/smyklot.git
 cd smyklot
 
 # Install tools

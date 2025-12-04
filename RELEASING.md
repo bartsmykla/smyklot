@@ -70,7 +70,7 @@ Trigger a release manually via GitHub Actions:
 
 Each release produces:
 
-1. **Docker Image**: `ghcr.io/bartsmykla/smyklot:X.Y.Z`
+1. **Docker Image**: `ghcr.io/smykla-labs/smyklot:X.Y.Z`
    - Multi-architecture: `linux/amd64`, `linux/arm64`
    - Tagged with: `X.Y.Z`, `X.Y`, `X`
 
@@ -138,7 +138,7 @@ Each release produces:
 
 **Docker Images**:
 
-- Registry: `ghcr.io/bartsmykla/smyklot`
+- Registry: `ghcr.io/smykla-labs/smyklot`
 - Tags: `X.Y.Z`, `X.Y`, `X`
 - Platforms: `linux/amd64`, `linux/arm64`
 
@@ -151,10 +151,10 @@ Each release produces:
 
 ```bash
 # Check latest release
-gh release view --repo bartsmykla/smyklot
+gh release view --repo smykla-labs/smyklot
 
 # List all releases
-gh release list --repo bartsmykla/smyklot
+gh release list --repo smykla-labs/smyklot
 
 # Check latest tag
 git tag --list 'v*' --sort=-version:refname | head -1
