@@ -8,4 +8,4 @@ branding:
 
 runs:
   using: 'docker'
-  image: 'docker://ghcr.io/smykla-labs/smyklot:1.9.2'
+  image: 'docker://ghcr.io/smykla-labs/smyklot:1.10.0'

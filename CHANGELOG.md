@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.0](https://github.com/smykla-labs/smyklot/compare/v1.9.2...v1.10.0) (2025-12-06)
+
+### Features
+
+* **config:** add renovate.json sync configuration ([#32](https://github.com/smykla-labs/smyklot/issues/32)) ([59382ea](https://github.com/smykla-labs/smyklot/commit/59382ea04bff81e1355e2fbf92d0a4c5433fdfa5))
+
 ## [1.9.2](https://github.com/smykla-labs/smyklot/compare/v1.9.1...v1.9.2) (2025-12-04)
 
 ### Bug Fixes
