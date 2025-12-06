@@ -2,10 +2,46 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:best-practices",
+    ":semanticCommits",
     ":gitSignOff",
+    ":dependencyDashboard",
     ":label(dependencies)",
-    ":enableVulnerabilityAlerts",
-    ":disableRateLimiting"
+    ":rebaseStalePrs",
+    ":enableVulnerabilityAlertsWithAdditionalLabel(kind/security)",
+    ":automergeMinor",
+    ":automergeDigest",
+    ":automergeLinters",
+    ":automergeTesters",
+    ":prConcurrentLimit20",
+    "helpers:pinGitHubActionDigests",
+    "security:openssf-scorecard",
+    "group:linters"
   ],
-  "rebaseWhen": "conflicted"
+  "ignorePaths": ["**/tmp/**"],
+  "osvVulnerabilityAlerts": true,
+  "packageRules": [
+    {
+      "addLabels": ["area/ci"],
+      "commitMessageTopic": "{{depName}} action",
+      "description": "GitHub Actions dependencies",
+      "matchManagers": ["github-actions"],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "Group Go tool dependencies",
+      "groupName": "Go tooling",
+      "matchDepTypes": ["require"],
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["/^golang.org/x/tools/"]
+    },
+    {
+      "description": "Group golangci-lint across mise and CI workflow",
+      "groupName": "golangci-lint",
+      "matchPackageNames": ["golangci-lint", "golangci/golangci-lint"]
+    }
+  ],
+  "rebaseWhen": "conflicted",
+  "vulnerabilityAlerts": {
+    "automerge": true
+  }
 }
