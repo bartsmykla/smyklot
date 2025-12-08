@@ -175,4 +175,4 @@ jobs:
         run: |
           gh api repos/smykla-labs/.github/dispatches \
             -f event_type="smyklot-release" \
-            -f "client_payload=$(jq -n --arg version "$VERSION" --arg tag "$TAG" '{version: $version, tag: $tag}')"
+            -F client_payload="$(jq -nc --arg version "$VERSION" --arg tag "$TAG" '{version: $version, tag: $tag}')"
