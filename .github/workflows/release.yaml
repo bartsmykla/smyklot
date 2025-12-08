@@ -12,7 +12,8 @@ on:
     - cron: '0 10 * * *'
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   # Check if workflow should proceed
@@ -32,13 +33,11 @@ jobs:
       - name: Conditions met
         run: echo "Workflow conditions met, proceeding with release process"
 
-  # Run tests first
+  # Run tests
   test:
     needs: check
     name: Test
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
     env:
       MISE_ENV: ci
 
@@ -54,21 +53,66 @@ jobs:
       - name: Run tests
         run: task test
 
+  # Run golangci-lint
+  golangci-lint:
+    needs: check
+    name: Go Lint
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
         with:
           version: latest
 
-      - name: Run other linters
-        run: |
-          task lint:markdown
-          task lint:mod
+  # Run markdownlint
+  markdownlint:
+    needs: check
+    name: Markdown Lint
+    runs-on: ubuntu-24.04
+    env:
+      MISE_ENV: ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Install mise
+        uses: jdx/mise-action@146a28175021df8ca24f8ee1828cc2a60f980bd5 # v3.5.1
+        with:
+          cache: true
+
+      - name: Run markdownlint
+        run: task lint:markdown
+
+  # Verify go.mod
+  go-mod-verify:
+    needs: check
+    name: Go Mod Verify
+    runs-on: ubuntu-24.04
+    env:
+      MISE_ENV: ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Install mise
+        uses: jdx/mise-action@146a28175021df8ca24f8ee1828cc2a60f980bd5 # v3.5.1
+        with:
+          cache: true
+
+      - name: Verify go.mod
+        run: task lint:mod
 
   # Determine if a release should be created
   release:
     name: Semantic Release
     runs-on: ubuntu-24.04
-    needs: test
+    needs: [test, golangci-lint, markdownlint, go-mod-verify]
     permissions:
       contents: write
       issues: write
@@ -154,8 +198,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [release, goreleaser]
     if: needs.goreleaser.result == 'success'
-    permissions:
-      contents: read
 
     steps:
       - name: Generate App Token
