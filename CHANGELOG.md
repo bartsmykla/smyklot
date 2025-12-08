@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.4](https://github.com/smykla-labs/smyklot/compare/v1.10.3...v1.10.4) (2025-12-08)
+
+### Bug Fixes
+
+* **sync-config:** disable smyklot workflow sync ([a73efe9](https://github.com/smykla-labs/smyklot/commit/a73efe9ac99941d72c898b94770c52111ca0988b))
+
 ## [1.10.3](https://github.com/smykla-labs/smyklot/compare/v1.10.2...v1.10.3) (2025-12-08)
 
 ### Bug Fixes
