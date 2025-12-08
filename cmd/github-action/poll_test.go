@@ -296,7 +296,7 @@ var _ = Describe("Poll Pending CI [Unit]", func() {
 					label:  github.LabelPendingCIMerge,
 				}
 
-				err = processPendingCIPR(context.Background(), client, bc, "owner", "repo", pr)
+				err = processPendingCIPR(context.Background(), client, bc, "owner", "repo", pr, "smyklot[bot]")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mergeRequested).To(BeTrue())
 				Expect(labelRemoved).To(BeTrue())
@@ -359,7 +359,7 @@ var _ = Describe("Poll Pending CI [Unit]", func() {
 					label:  github.LabelPendingCIMerge,
 				}
 
-				err = processPendingCIPR(context.Background(), client, bc, "owner", "repo", pr)
+				err = processPendingCIPR(context.Background(), client, bc, "owner", "repo", pr, "smyklot[bot]")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(labelRemoved).To(BeTrue())
 				Expect(commentPosted).To(BeTrue())
@@ -415,7 +415,7 @@ var _ = Describe("Poll Pending CI [Unit]", func() {
 					label:  github.LabelPendingCIMerge,
 				}
 
-				err = processPendingCIPR(context.Background(), client, bc, "owner", "repo", pr)
+				err = processPendingCIPR(context.Background(), client, bc, "owner", "repo", pr, "smyklot[bot]")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mergeRequested).To(BeFalse())
 				Expect(labelRemoved).To(BeFalse())
@@ -478,7 +478,7 @@ var _ = Describe("Poll Pending CI [Unit]", func() {
 					label:  github.LabelPendingCISquash,
 				}
 
-				err = processPendingCIPR(context.Background(), client, bc, "owner", "repo", pr)
+				err = processPendingCIPR(context.Background(), client, bc, "owner", "repo", pr, "smyklot[bot]")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(mergeMethod).To(Equal("squash"))
 			})
@@ -508,7 +508,7 @@ var _ = Describe("Poll Pending CI [Unit]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			bc := config.Default()
-			err = processPendingCIPRs(context.Background(), client, bc, "owner", "repo", prs)
+			err = processPendingCIPRs(context.Background(), client, bc, "owner", "repo", prs, "smyklot[bot]")
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

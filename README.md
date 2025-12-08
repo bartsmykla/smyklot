@@ -191,6 +191,7 @@ Set a `SMYKLOT_CONFIG` repository variable with your complete configuration:
 {
   "quiet_success": false,
   "quiet_reactions": false,
+  "quiet_pending": false,
   "allowed_commands": ["approve", "merge"],
   "command_aliases": {
     "ok": "approve",
@@ -214,6 +215,7 @@ Configure individual settings via repository variables or environment variables 
 |------------------------------------|---------|----------------|----------------------------------------------------------------------------|
 | `SMYKLOT_QUIET_SUCCESS`            | boolean | `false`        | Disable success feedback comments                                          |
 | `SMYKLOT_QUIET_REACTIONS`          | boolean | `false`        | Disable reaction-based approval/merge comments                             |
+| `SMYKLOT_QUIET_PENDING`            | boolean | `false`        | Disable pending CI comments (reactions only for "merge after CI")          |
 | `SMYKLOT_ALLOWED_COMMANDS`         | list    | all            | Limit which commands are allowed                                           |
 | `SMYKLOT_COMMAND_ALIASES`          | map     | default        | Define custom command aliases                                              |
 | `SMYKLOT_COMMAND_PREFIX`           | string  | `/`            | Custom command prefix                                                      |

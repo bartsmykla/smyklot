@@ -436,6 +436,7 @@ All configuration options support three input methods with precedence:
 {
   "quiet_success": false,
   "quiet_reactions": false,
+  "quiet_pending": false,
   "allowed_commands": [],
   "command_aliases": {},
   "command_prefix": "/",
@@ -454,6 +455,7 @@ All variables prefixed with `SMYKLOT_`:
 
 - `SMYKLOT_QUIET_SUCCESS`
 - `SMYKLOT_QUIET_REACTIONS`
+- `SMYKLOT_QUIET_PENDING`
 - `SMYKLOT_ALLOWED_COMMANDS`
 - `SMYKLOT_COMMAND_ALIASES`
 - `SMYKLOT_COMMAND_PREFIX`

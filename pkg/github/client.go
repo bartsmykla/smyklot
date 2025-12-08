@@ -677,6 +677,116 @@ func (c *Client) DeleteComment(ctx context.Context, owner, repo string, commentI
 	return err
 }
 
+// UpdatePendingCIReaction finds comments with the bot's "eyes" reaction and replaces with "+1"
+//
+// This is used after a pending-ci merge succeeds to update the visual feedback.
+// It searches all comments on the PR, finds ones with "eyes" reaction from the bot,
+// removes the "eyes" reaction, and adds a "+1" (thumbs up) reaction.
+func (c *Client) UpdatePendingCIReaction(
+	ctx context.Context,
+	owner, repo string,
+	prNumber int,
+	botUsername string,
+) error {
+	// Get all comments on the PR
+	comments, err := c.GetPRComments(ctx, owner, repo, prNumber)
+	if err != nil {
+		return err
+	}
+
+	// Check each comment for bot's "eyes" reaction
+	for _, comment := range comments {
+		commentIDFloat, ok := comment["id"].(float64)
+		if !ok {
+			continue
+		}
+
+		commentID := int(commentIDFloat)
+
+		// Get reactions for this comment
+		reactions, err := c.GetCommentReactions(ctx, owner, repo, commentID)
+		if err != nil {
+			continue // Skip comments we can't get reactions for
+		}
+
+		// Check if bot has an "eyes" reaction on this comment
+		hasBotEyesReaction := false
+
+		for _, reaction := range reactions {
+			if reaction.User == botUsername && reaction.Type == ReactionPendingCI {
+				hasBotEyesReaction = true
+
+				break
+			}
+		}
+
+		if hasBotEyesReaction {
+			// Remove the "eyes" reaction
+			_ = c.RemoveReactionByUser(ctx, owner, repo, commentID, ReactionPendingCI, botUsername)
+
+			// Add "+1" (thumbs up) reaction
+			_ = c.AddReaction(ctx, owner, repo, commentID, ReactionSuccess)
+		}
+	}
+
+	return nil
+}
+
+// RemoveReactionByUser removes a specific reaction from a comment, but only if it belongs to the specified user
+func (c *Client) RemoveReactionByUser(
+	ctx context.Context,
+	owner, repo string,
+	commentID int,
+	reaction ReactionType,
+	username string,
+) error {
+	// Get all reactions on the comment
+	path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d/reactions", owner, repo, commentID)
+
+	data, err := c.makeRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return err
+	}
+
+	var reactions []map[string]interface{}
+	if err := json.Unmarshal(data, &reactions); err != nil {
+		return NewAPIError(ErrResponseParse, 0, "GET", path, err)
+	}
+
+	// Find and delete matching reactions from the specific user
+	for _, r := range reactions {
+		content, contentOK := r["content"].(string)
+		user, userOK := r["user"].(map[string]interface{})
+
+		if !contentOK || !userOK {
+			continue
+		}
+
+		login, loginOK := user["login"].(string)
+		if !loginOK {
+			continue
+		}
+
+		if content == string(reaction) && login == username {
+			if id, ok := r["id"].(float64); ok {
+				deletePath := fmt.Sprintf(
+					"/repos/%s/%s/issues/comments/%d/reactions/%d",
+					owner,
+					repo,
+					commentID,
+					int(id),
+				)
+
+				if _, err := c.makeRequest(ctx, "DELETE", deletePath, nil); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // GetOpenPRs retrieves all open pull requests in a repository
 //
 // Returns a slice of PR data including number, title, and state.
