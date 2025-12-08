@@ -13,6 +13,9 @@ type Config struct {
 	// QuietReactions disables reaction-based approval/merge comments
 	QuietReactions bool `json:"quiet_reactions"`
 
+	// QuietPending disables pending CI comments (keeps reactions only)
+	QuietPending bool `json:"quiet_pending"`
+
 	// AllowedCommands is a list of allowed command names
 	// an Empty list means all commands are allowed
 	AllowedCommands []string `json:"allowed_commands"`
@@ -50,6 +53,7 @@ func Default() *Config {
 	return &Config{
 		QuietSuccess:           false,
 		QuietReactions:         false,
+		QuietPending:           false,
 		AllowedCommands:        []string{},
 		CommandAliases:         make(map[string]string),
 		CommandPrefix:          DefaultCommandPrefix,

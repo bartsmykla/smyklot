@@ -954,7 +954,7 @@ func executePendingCIMerge(
 	// Return pending feedback
 	methodName := getMergeMethodName(method)
 
-	return feedback.NewPendingCI(rc.CommentAuthor, methodName), nil
+	return feedback.NewPendingCI(rc.CommentAuthor, methodName, bc.QuietPending), nil
 }
 
 // executeImmediateMerge performs the actual merge when CI has already passed

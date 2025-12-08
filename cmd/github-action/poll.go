@@ -58,6 +58,11 @@ func runPoll(cmd *cobra.Command, _ []string) error {
 	loadEnvIfEmpty(&rc.GitHubAppClientID, envGitHubAppClientID)
 	loadEnvIfEmpty(&rc.GitHubAppID, envGitHubAppID)
 	loadEnvIfEmpty(&rc.InstallationID, envInstallationID)
+	loadEnvIfEmpty(&rc.BotUsername, envBotUsername)
+
+	if rc.BotUsername == "" {
+		rc.BotUsername = defaultBotUsername
+	}
 
 	// Load bot configuration
 	bc, err := loadPollBotConfig(v)
@@ -84,7 +89,7 @@ func runPoll(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Poll and process all open PRs
-	return pollAllPRs(ctx, client, checker, bc, repoOwner, repoName)
+	return pollAllPRs(ctx, client, checker, bc, repoOwner, repoName, rc.BotUsername)
 }
 
 // loadPollBotConfig loads bot configuration from JSON config and Viper
@@ -189,6 +194,7 @@ func pollAllPRs(
 	checker *permissions.Checker,
 	bc *config.Config,
 	repoOwner, repoName string,
+	botUsername string,
 ) error {
 	fmt.Printf("Polling PR reactions in %s/%s\n", repoOwner, repoName)
 
@@ -213,7 +219,7 @@ func pollAllPRs(
 	}
 
 	// Process pending-ci PRs (waiting for CI to pass before merge)
-	if err := processPendingCIPRs(ctx, client, bc, repoOwner, repoName, prs); err != nil {
+	if err := processPendingCIPRs(ctx, client, bc, repoOwner, repoName, prs, botUsername); err != nil {
 		fmt.Fprintf(os.Stderr, "  Warning: failed to process pending-ci PRs: %v\n", err)
 	}
 
@@ -286,6 +292,7 @@ func processPendingCIPRs(
 	bc *config.Config,
 	repoOwner, repoName string,
 	prs []map[string]interface{},
+	botUsername string,
 ) error {
 	// Filter PRs with pending-ci labels
 	pendingPRs := filterPendingCIPRs(prs)
@@ -297,7 +304,7 @@ func processPendingCIPRs(
 	fmt.Printf("\nProcessing %d PR(s) waiting for CI\n", len(pendingPRs))
 
 	for _, pr := range pendingPRs {
-		if err := processPendingCIPR(ctx, client, bc, repoOwner, repoName, pr); err != nil {
+		if err := processPendingCIPR(ctx, client, bc, repoOwner, repoName, pr, botUsername); err != nil {
 			prNum := extractPRNumber(pr.prData)
 			fmt.Fprintf(os.Stderr, "  Warning: failed to process pending-ci PR #%d: %v\n", prNum, err)
 		}
@@ -392,6 +399,7 @@ func processPendingCIPR(
 	bc *config.Config,
 	repoOwner, repoName string,
 	pr pendingCIPR,
+	botUsername string,
 ) error {
 	prNumber := extractPRNumber(pr.prData)
 	if prNumber == 0 {
@@ -432,7 +440,7 @@ func processPendingCIPR(
 	// Handle based on CI status
 	switch {
 	case checkStatus.AllPassing:
-		return handlePendingCIPassed(ctx, client, bc, repoOwner, repoName, prNumber, pr)
+		return handlePendingCIPassed(ctx, client, bc, repoOwner, repoName, prNumber, pr, botUsername)
 
 	case checkStatus.Failing:
 		return handlePendingCIFailed(ctx, client, bc, repoOwner, repoName, prNumber, pr, checkStatus.Summary)
@@ -453,6 +461,7 @@ func handlePendingCIPassed(
 	repoOwner, repoName string,
 	prNumber int,
 	pr pendingCIPR,
+	botUsername string,
 ) error {
 	fmt.Printf("    CI passed! Merging PR #%d\n", prNumber)
 
@@ -472,6 +481,9 @@ func handlePendingCIPassed(
 
 	// Remove pending-ci label
 	_ = client.RemoveLabel(ctx, repoOwner, repoName, prNumber, pr.label)
+
+	// Update pending CI reaction from 👀 to 👍
+	_ = client.UpdatePendingCIReaction(ctx, repoOwner, repoName, prNumber, botUsername)
 
 	// Post success feedback
 	// We don't know who requested the merge, so use a generic message

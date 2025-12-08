@@ -448,14 +448,19 @@ func NewReactionMergeRemoved() *Feedback {
 // NewPendingCI creates pending feedback for when merge is waiting for CI
 //
 // The message indicates who triggered the merge and what merge method will be used
-func NewPendingCI(author string, method string) *Feedback {
-	message := fmt.Sprintf(
-		"⏳ **Waiting for CI**\n\n"+
-			"Merge requested by `%s`. Will %s when all checks pass.\n\n"+
-			"The PR will be merged automatically once CI succeeds.",
-		author,
-		method,
-	)
+// If quietPending is true, only an emoji reaction is used (no comment)
+func NewPendingCI(author string, method string, quietPending bool) *Feedback {
+	message := ""
+
+	if !quietPending {
+		message = fmt.Sprintf(
+			"⏳ **Waiting for CI**\n\n"+
+				"Merge requested by `%s`. Will %s when all checks pass.\n\n"+
+				"The PR will be merged automatically once CI succeeds.",
+			author,
+			method,
+		)
+	}
 
 	return &Feedback{
 		Type:    Pending,

@@ -18,6 +18,9 @@ const (
 	// KeyQuietReactions is the config key for quiet_reactions setting
 	KeyQuietReactions = "quiet_reactions"
 
+	// KeyQuietPending is the config key for quiet_pending setting
+	KeyQuietPending = "quiet_pending"
+
 	// KeyAllowedCommands is the config key for allowed_commands setting
 	KeyAllowedCommands = "allowed_commands"
 
@@ -57,6 +60,7 @@ func SetupViper(v *viper.Viper) {
 	// Set defaults
 	v.SetDefault(KeyQuietSuccess, false)
 	v.SetDefault(KeyQuietReactions, false)
+	v.SetDefault(KeyQuietPending, false)
 	v.SetDefault(KeyAllowedCommands, []string{})
 	v.SetDefault(KeyCommandAliases, map[string]string{})
 	v.SetDefault(KeyCommandPrefix, DefaultCommandPrefix)
@@ -77,6 +81,7 @@ func LoadFromViper(v *viper.Viper) *Config {
 	return &Config{
 		QuietSuccess:           v.GetBool(KeyQuietSuccess),
 		QuietReactions:         v.GetBool(KeyQuietReactions),
+		QuietPending:           v.GetBool(KeyQuietPending),
 		AllowedCommands:        v.GetStringSlice(KeyAllowedCommands),
 		CommandAliases:         v.GetStringMapString(KeyCommandAliases),
 		CommandPrefix:          v.GetString(KeyCommandPrefix),

@@ -327,7 +327,7 @@ var _ = Describe("Feedback System [Unit]", func() {
 
 	Describe("NewPendingCI", func() {
 		It("should create pending feedback with hourglass emoji", func() {
-			fb := feedback.NewPendingCI("alice", "merge")
+			fb := feedback.NewPendingCI("alice", "merge", false)
 			Expect(fb.Type).To(Equal(feedback.Pending))
 			Expect(fb.Emoji).To(Equal("⏳"))
 			Expect(fb.Message).To(ContainSubstring("Waiting for CI"))
@@ -339,14 +339,21 @@ var _ = Describe("Feedback System [Unit]", func() {
 			methods := []string{"merge", "squash", "rebase"}
 
 			for _, method := range methods {
-				fb := feedback.NewPendingCI("bob", method)
+				fb := feedback.NewPendingCI("bob", method, false)
 				Expect(fb.Message).To(ContainSubstring(method))
 			}
 		})
 
 		It("should indicate automatic merge on CI success", func() {
-			fb := feedback.NewPendingCI("alice", "merge")
+			fb := feedback.NewPendingCI("alice", "merge", false)
 			Expect(fb.Message).To(ContainSubstring("automatically"))
+		})
+
+		It("should create pending feedback with emoji only when quietPending=true", func() {
+			fb := feedback.NewPendingCI("alice", "merge", true)
+			Expect(fb.Type).To(Equal(feedback.Pending))
+			Expect(fb.Emoji).To(Equal("⏳"))
+			Expect(fb.Message).To(BeEmpty())
 		})
 	})
 
