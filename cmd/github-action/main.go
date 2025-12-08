@@ -15,7 +15,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/jferrl/go-githubauth"
+	"github.com/jferrl/go-githubauth/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 

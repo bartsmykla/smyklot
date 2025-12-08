@@ -3,7 +3,7 @@ module github.com/smykla-labs/smyklot
 go 1.25.4
 
 require (
-	github.com/jferrl/go-githubauth v1.5.0
+	github.com/jferrl/go-githubauth/v2 v2.0.0
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
 	github.com/spf13/cobra v1.10.2
@@ -18,6 +18,8 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/go-github/v73 v73.0.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20251007162407-5df77e3f7d1d // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
