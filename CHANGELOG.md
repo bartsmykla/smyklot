@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.3](https://github.com/smykla-labs/smyklot/compare/v1.10.2...v1.10.3) (2025-12-08)
+
+### Bug Fixes
+
+* **release:** fix client_payload JSON in gh api ([#39](https://github.com/smykla-labs/smyklot/issues/39)) ([d8ba012](https://github.com/smykla-labs/smyklot/commit/d8ba01254a4fbc3edf4c8a056a7a820da2e56ecb))
+
 ## [1.10.2](https://github.com/smykla-labs/smyklot/compare/v1.10.1...v1.10.2) (2025-12-08)
 
 ### Bug Fixes
