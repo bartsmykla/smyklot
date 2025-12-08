@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.0](https://github.com/smykla-labs/smyklot/compare/v1.10.4...v1.11.0) (2025-12-08)
+
+### Features
+
+* **config:** add `quiet_pending` option ([#41](https://github.com/smykla-labs/smyklot/issues/41)) ([eb902ba](https://github.com/smykla-labs/smyklot/commit/eb902ba4e31e17e2b8ba48b50d7321b8cb66e09d))
+
 ## [1.10.4](https://github.com/smykla-labs/smyklot/compare/v1.10.3...v1.10.4) (2025-12-08)
 
 ### Bug Fixes
