@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.2](https://github.com/smykla-labs/smyklot/compare/v1.10.1...v1.10.2) (2025-12-08)
+
+### Bug Fixes
+
+* **docker:** avoid QEMU emulation failures ([#38](https://github.com/smykla-labs/smyklot/issues/38)) ([5430f15](https://github.com/smykla-labs/smyklot/commit/5430f157c01085509ad2be0ff270a85d581d857b))
+
 ## [1.10.1](https://github.com/smykla-labs/smyklot/compare/v1.10.0...v1.10.1) (2025-12-08)
 
 ### Bug Fixes
