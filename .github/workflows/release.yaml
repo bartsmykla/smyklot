@@ -173,6 +173,8 @@ jobs:
           VERSION: ${{ needs.release.outputs.new_release_version }}
           TAG: ${{ needs.release.outputs.new_release_git_tag }}
         run: |
-          gh api repos/smykla-labs/.github/dispatches \
-            -f event_type="smyklot-release" \
-            -F client_payload="$(jq -nc --arg version "$VERSION" --arg tag "$TAG" '{version: $version, tag: $tag}')"
+          jq -nc \
+            --arg version "$VERSION" \
+            --arg tag "$TAG" \
+            '{event_type: "smyklot-release", client_payload: {version: $version, tag: $tag}}' \
+          | gh api repos/smykla-labs/.github/dispatches --input -

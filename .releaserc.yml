@@ -64,4 +64,5 @@ plugins:
         - action.yml
       message: "chore(release): bump version to ${nextRelease.version}\n\n${nextRelease.notes}"
 
-  - "@semantic-release/github"
+  - - "@semantic-release/github"
+    - successComment: "🎉 Shipped in [**v${nextRelease.version}**](${releases[0].url})"
