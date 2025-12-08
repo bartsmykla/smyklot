@@ -6,6 +6,8 @@
 sync:
   labels:
     allow_removal: true
+  smyklot:
+    skip: true
   files:
     merge:
       - path: renovate.json
