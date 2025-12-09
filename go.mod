@@ -1,6 +1,6 @@
 module github.com/smykla-labs/smyklot
 
-go 1.25.4
+go 1.25.5
 
 require (
 	github.com/jferrl/go-githubauth/v2 v2.0.0
