@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/smykla-labs/smyklot/compare/v1.11.0...v1.11.1) (2025-12-10)
+
+### Bug Fixes
+
+* **deps:** update ginkgo to v2.27.3 ([#49](https://github.com/smykla-labs/smyklot/issues/49)) ([c8f5289](https://github.com/smykla-labs/smyklot/commit/c8f528997b37d734505607c191d640cb1dc13109))
+* **deps:** update module github.com/onsi/gomega to v1.38.3 ([#46](https://github.com/smykla-labs/smyklot/issues/46)) ([2fb5a5f](https://github.com/smykla-labs/smyklot/commit/2fb5a5fbeefb7714dd4c6ad7992fba235ced9aa4))
+
 ## [1.11.0](https://github.com/smykla-labs/smyklot/compare/v1.10.4...v1.11.0) (2025-12-08)
 
 ### Features
